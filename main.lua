@@ -40,12 +40,21 @@ local retrieve_data_dirs = function()
     return data_dirs
 end
 
-local find_desktop_entries = function(dir)
+local find_desktop_entries
+find_desktop_entries = function(dir)
     local files, err = fs.read_dir(Url(dir), { })
     if not files then
-	return {}
+	    return {}
     end
-    return files
+    local return_table = {}
+    for i,file in ipairs(files) do
+        if file.cha.is_dir then
+            return_table[file.name] = find_desktop_entries(dir.."/"..file.name)
+        else
+            return_table[file.name] = file.url
+        end
+    end
+    return return_table
 end
 
 local find_all_desktop_entries = function()
