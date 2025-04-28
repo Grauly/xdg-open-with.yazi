@@ -30,6 +30,10 @@ function dump(o)
     end
 end
 
+function string:endswith(suffix)
+    return self:sub(- #suffix) == suffix
+end
+
 local retrieve_data_dirs = function()
     -- hack to get a output in the format of :<path>::<next path::<another next path>:
     local raw_dirs = ":" .. os.getenv("XDG_DATA_DIRS"):gsub(":", "::") .. ":"
@@ -49,9 +53,14 @@ find_desktop_entries = function(dir)
     local return_table = {}
     for i, file in ipairs(files) do
         if file.cha.is_dir then
-            return_table[file.name] = find_desktop_entries(dir .. "/" .. file.name)
+            local entries = find_desktop_entries(dir .. "/" .. file.name)
+            if not (next(entries) == nil) then
+                return_table[file.name] = entries
+            end
         else
-            return_table[file.name] = file.url
+            if file.name:endswith(".desktop") then
+                return_table[file.name] = file.url
+            end
         end
     end
     return return_table
@@ -62,10 +71,11 @@ local find_all_desktop_entries = function()
     local desktop_entries = {}
     for k, v in ipairs(data_dirs) do
         local files = find_desktop_entries(v)
-        for _, f in ipairs(files) do
-            desktop_entries[#desktop_entries + 1] = f
+        if not (next(files) == nil) then
+            desktop_entries[v] = files
         end
     end
+    ya.dbg(dump(desktop_entries))
     local formatted_entries = {}
     for k, v in ipairs(desktop_entries) do
         formatted_entries[k] = {
