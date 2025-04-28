@@ -18,38 +18,38 @@ local error = function(content)
 end
 
 function dump(o)
-   if type(o) == 'table' then
-      local s = '{ '
-      for k,v in pairs(o) do
-         if type(k) ~= 'number' then k = '"'..k..'"' end
-         s = s .. '['..k..'] = ' .. dump(v) .. ','
-      end
-      return s .. '} '
-   else
-      return tostring(o)
-   end
+    if type(o) == 'table' then
+        local s = '{ '
+        for k, v in pairs(o) do
+            if type(k) ~= 'number' then k = '"' .. k .. '"' end
+            s = s .. '[' .. k .. '] = ' .. dump(v) .. ','
+        end
+        return s .. '} '
+    else
+        return tostring(o)
+    end
 end
 
 local retrieve_data_dirs = function()
     -- hack to get a output in the format of :<path>::<next path::<another next path>:
-    local raw_dirs = ":"..os.getenv("XDG_DATA_DIRS"):gsub(":", "::")..":"
+    local raw_dirs = ":" .. os.getenv("XDG_DATA_DIRS"):gsub(":", "::") .. ":"
     local data_dirs = {}
     for entry in raw_dirs:gmatch("%b::") do
-	data_dirs[#data_dirs+ 1] = entry:gsub(":", "")
+        data_dirs[#data_dirs + 1] = entry:gsub(":", "")
     end
     return data_dirs
 end
 
 local find_desktop_entries
 find_desktop_entries = function(dir)
-    local files, err = fs.read_dir(Url(dir), { })
+    local files, err = fs.read_dir(Url(dir), {})
     if not files then
-	    return {}
+        return {}
     end
     local return_table = {}
-    for i,file in ipairs(files) do
+    for i, file in ipairs(files) do
         if file.cha.is_dir then
-            return_table[file.name] = find_desktop_entries(dir.."/"..file.name)
+            return_table[file.name] = find_desktop_entries(dir .. "/" .. file.name)
         else
             return_table[file.name] = file.url
         end
@@ -60,18 +60,18 @@ end
 local find_all_desktop_entries = function()
     local data_dirs = retrieve_data_dirs()
     local desktop_entries = {}
-    for k,v in ipairs(data_dirs) do
-	local files = find_desktop_entries(v)
-	for _,f in ipairs(files) do
-	    desktop_entries[#desktop_entries + 1] = f
-	end
+    for k, v in ipairs(data_dirs) do
+        local files = find_desktop_entries(v)
+        for _, f in ipairs(files) do
+            desktop_entries[#desktop_entries + 1] = f
+        end
     end
     local formatted_entries = {}
-    for k,v in ipairs(desktop_entries) do
-	formatted_entries[k] = {
-	    is_dir = v.cha.is_dir,
-	    name = v.name
-	}
+    for k, v in ipairs(desktop_entries) do
+        formatted_entries[k] = {
+            is_dir = v.cha.is_dir,
+            name = v.name
+        }
     end
     return formatted_entries
 end
@@ -162,9 +162,9 @@ end
 
 function M:act_user_input(action)
     if action == "up" then
-	update_cursor(-1)
+        update_cursor(-1)
     elseif action == "down" then
-	update_cursor(1)
+        update_cursor(1)
     end
 end
 
@@ -203,8 +203,8 @@ end
 -- actually draw the content, is synced, so cannot use Command
 function M:redraw()
     local rows = {}
-    for k,v in pairs(self.desktop_entries) do
-	rows[k] = ui.Row {tostring(v.is_dir), v.name}
+    for k, v in pairs(self.desktop_entries) do
+        rows[k] = ui.Row { tostring(v.is_dir), v.name }
     end
     -- basically stolen from https://github.com/yazi-rs/plugins/blob/a1738e8088366ba73b33da5f45010796fb33221e/mount.yazi/main.lua#L144
     return {
