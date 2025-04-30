@@ -1,4 +1,5 @@
 local header_name = "xdg-open-with"
+local log_prefix = "[" .. header_name .. "] "
 
 local notify = function(content, level)
     ya.notify {
@@ -15,6 +16,14 @@ end
 
 local error = function(content)
     notify(content, "error")
+end
+
+local dbg = function(content)
+    ya.dbg(log_prefix .. content)
+end
+
+local dbgerr = function(content)
+    ya.err(log_prefix .. content)
 end
 
 function dump(o)
@@ -34,6 +43,19 @@ function string:endswith(suffix)
     return self:sub(- #suffix) == suffix
 end
 
+function mergeTables(a, b, replace)
+    local result = {}
+    for k, v in pairs(a) do
+        result[k] = v
+    end
+    for k, v in pairs(b) do
+        if ((result[k] == nil) or (replace)) then
+            result[k] = v
+        end
+    end
+    return result
+end
+
 local retrieve_data_dirs = function()
     -- hack to get a output in the format of :<path>::<next path::<another next path>:
     local raw_dirs = ":" .. os.getenv("XDG_DATA_DIRS"):gsub(":", "::") .. ":"
@@ -44,50 +66,60 @@ local retrieve_data_dirs = function()
     return data_dirs
 end
 
-local find_desktop_entries
-find_desktop_entries = function(dir)
-    local files, err = fs.read_dir(Url(dir), {})
-    if not files then
+local get_files = function(url, opts)
+    local files, err = fs.read_dir(url, opts)
+    if err then
+        dbgerr("Error accessing: " .. dump(url) .. " : " .. dump(err))
         return {}
     end
-    local return_table = {}
-    for i, file in ipairs(files) do
-        if file.cha.is_dir then
-            local entries = find_desktop_entries(dir .. "/" .. file.name)
-            if not (next(entries) == nil) then
-                return_table[file.name] = entries
-            end
+    return files
+end
+
+local url_to_desktop_id = function(strip_prefix, url)
+    local url_string = tostring(url:strip_prefix(strip_prefix))
+    url_string = url_string:gsub("-", "_")
+    url_string = url_string:gsub("/", "-")
+    return url_string
+end
+
+local collect_desktop_entries
+collect_desktop_entries = function(applications_url, search_url)
+    local files = get_files(search_url, {})
+    local applications = {}
+    for _, file in ipairs(files) do
+        if (file.cha.is_dir) then
+            local sub_applications = collect_desktop_entries(Url(search_url):join(file.name))
+            applications = mergeTables(applications, sub_applications, false)
         else
             if file.name:endswith(".desktop") then
-                return_table[file.name] = file.url
+                applications[url_to_desktop_id(applications_url, file.url)] = file.url
             end
         end
     end
-    return return_table
+    return applications
+end
+
+local find_desktop_entries = function(dir)
+    local search_location = Url(dir):join("applications")
+    return collect_desktop_entries(search_location, search_location)
 end
 
 local find_all_desktop_entries = function()
     local data_dirs = retrieve_data_dirs()
     local desktop_entries = {}
-    for k, v in ipairs(data_dirs) do
-        local files = find_desktop_entries(v)
-        if not (next(files) == nil) then
-            desktop_entries[v] = files
-        end
+    for _, v in ipairs(data_dirs) do
+        local entries = find_desktop_entries(v)
+        desktop_entries = mergeTables(desktop_entries, entries, false)
     end
-    ya.dbg(dump(desktop_entries))
-    local formatted_entries = {}
-    for k, v in ipairs(desktop_entries) do
-        formatted_entries[k] = {
-            is_dir = v.cha.is_dir,
-            name = v.name
-        }
-    end
-    return formatted_entries
+    return desktop_entries
 end
 
 local update_desktop_entries = ya.sync(function(self, entries)
-    self.desktop_entries = entries
+    local raw_display_entries = {}
+    for k, _ in pairs(entries) do
+        raw_display_entries[#raw_display_entries + 1] = k
+    end
+    self.desktop_entries = raw_display_entries
     ya.render()
 end)
 
@@ -214,7 +246,7 @@ end
 function M:redraw()
     local rows = {}
     for k, v in pairs(self.desktop_entries) do
-        rows[k] = ui.Row { tostring(v.is_dir), v.name }
+        rows[k] = ui.Row { v, "" }
     end
     -- basically stolen from https://github.com/yazi-rs/plugins/blob/a1738e8088366ba73b33da5f45010796fb33221e/mount.yazi/main.lua#L144
     return {
@@ -230,8 +262,8 @@ function M:redraw()
             :row(self.cursor)
             :row_style(ui.Style():fg("blue"):underline())
             :widths {
+                ui.Constraint.Percentage(90),
                 ui.Constraint.Percentage(10),
-                ui.Constraint.Percentage(90)
             },
     }
 end
