@@ -72,6 +72,12 @@ function mergeTables(a, b, replace)
     return result
 end
 
+function first(list)
+  local first = table.unpack(list, 1, 1)
+  local remainder = { table.unpack(list, 2) }
+  return first, remainder
+end
+
 local exists_file = function(location)
     if (type(location) ~= "string") then
         location = tostring(location)
