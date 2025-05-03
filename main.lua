@@ -72,6 +72,29 @@ function mergeTables(a, b, replace)
     return result
 end
 
+local exists_file = function(location)
+    if (type(location) ~= "string") then
+        location = tostring(location)
+    end
+    local file = io.open(location, "rb")
+    return file ~= nil
+end
+
+local get_file = function(location)
+    if (type(location) ~= "string") then
+        location = tostring(location)
+    end
+    if not exists_file(location) then
+        return {}
+    end
+    local file = io.open(location, "r")
+    local lines = {}
+    for line in io.lines(file) do
+        lines[#lines + 1] = line
+    end
+    return lines
+end
+
 --needs a plugin named "nix-commands" with a database of commands
 local get_nix_command = function(command)
     if(command:beginswith("/")) then return command end
