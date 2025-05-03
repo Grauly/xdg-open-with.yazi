@@ -43,6 +43,19 @@ function string:endswith(suffix)
     return self:sub(- #suffix) == suffix
 end
 
+
+function string:split(split)
+    self = self..split
+    local results = {}
+    for match, delimiter in self:gmatch("(.-)("..split..")") do
+        table.insert(results, match)
+        if (delimiter == "") then
+            return results
+        end
+    end
+    return results
+end
+
 function mergeTables(a, b, replace)
     local result = {}
     for k, v in pairs(a) do
@@ -57,13 +70,7 @@ function mergeTables(a, b, replace)
 end
 
 local retrieve_data_dirs = function()
-    -- hack to get a output in the format of :<path>::<next path::<another next path>:
-    local raw_dirs = ":" .. os.getenv("XDG_DATA_DIRS"):gsub(":", "::") .. ":"
-    local data_dirs = {}
-    for entry in raw_dirs:gmatch("%b::") do
-        data_dirs[#data_dirs + 1] = entry:gsub(":", "")
-    end
-    return data_dirs
+    return os.getenv("XDG_DATA_DIRS"):split(":")
 end
 
 local get_files = function(url, opts)
