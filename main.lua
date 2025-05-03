@@ -72,9 +72,32 @@ function mergeTables(a, b, replace)
     return result
 end
 
+--needs a plugin named "nix-commands" with a database of commands
+local get_nix_command = function(command)
+    if(command:beginswith("/")) then return command end
+    
+    local loaded, content = pcall(require, "nix-commands")
+    if not loaded then
+        ya.err(content)
+        return command
+    end
+    if not content.commands then
+        ya.err("nix-commands does not have a commands section, defaulting")
+        return command
+    end
+    local nix_command = content.commands[command]
+    if not nix_command then
+        ya.err("nix-commands does not have a \"" .. command .. "\" defined")
+        return command
+    end
+    return nix_command
+end
+
 local retrieve_data_dirs = function()
     return os.getenv("XDG_DATA_DIRS"):split(":")
 end
+
+--end of utils section
 
 local get_files = function(url, opts)
     local files, err = fs.read_dir(url, opts)
