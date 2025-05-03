@@ -94,6 +94,7 @@ end
 
 local collect_desktop_entries
 collect_desktop_entries = function(applications_url, search_url)
+    --should be using glob = "*.desktop", but it just does not work
     local files = get_files(search_url, {})
     local applications = {}
     for _, file in ipairs(files) do
@@ -101,6 +102,7 @@ collect_desktop_entries = function(applications_url, search_url)
             local sub_applications = collect_desktop_entries(Url(search_url):join(file.name))
             applications = mergeTables(applications, sub_applications, false)
         else
+            --hence, this workaround
             if file.name:endswith(".desktop") then
                 applications[url_to_desktop_id(applications_url, file.url)] = file.url
             end
