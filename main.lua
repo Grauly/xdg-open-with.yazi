@@ -78,6 +78,15 @@ function first(list)
   return first, remainder
 end
 
+local get_files = function(url, opts)
+    local files, err = fs.read_dir(url, opts)
+    if err then
+        dbgerr("Error accessing: " .. dump(url) .. " : " .. dump(err))
+        return {}
+    end
+    return files
+end
+
 local exists_file = function(location)
     if (type(location) ~= "string") then
         location = tostring(location)
@@ -122,19 +131,10 @@ local get_nix_command = function(command)
     return nix_command
 end
 
-local retrieve_data_dirs = function()
-    return os.getenv("XDG_DATA_DIRS"):split(":")
-end
-
 --end of utils section
 
-local get_files = function(url, opts)
-    local files, err = fs.read_dir(url, opts)
-    if err then
-        dbgerr("Error accessing: " .. dump(url) .. " : " .. dump(err))
-        return {}
-    end
-    return files
+local retrieve_data_dirs = function()
+    return os.getenv("XDG_DATA_DIRS"):split(":")
 end
 
 local url_to_desktop_id = function(strip_prefix, url)
