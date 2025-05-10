@@ -144,6 +144,10 @@ local url_to_desktop_id = function(strip_prefix, url)
     return url_string
 end
 
+local desktop_id_to_dbus = function(id)
+    return "/"..id:gsub("%.desktop"):gsub(".", "/")
+end
+
 local collect_desktop_entries
 collect_desktop_entries = function(applications_url, search_url)
     --should be using glob = "*.desktop", but it just does not work
@@ -176,6 +180,134 @@ local find_all_desktop_entries = function()
         desktop_entries = mergeTables(desktop_entries, entries, false)
     end
     return desktop_entries
+end
+
+
+local parse_desktop_entry = function(id, abs_path)
+    local lines = get_file(abs_path)
+    if (next(lines) == nil) then
+        dbgerr("Attempted to read empty desktop entry: " .. id .. " at: " .. tostring(abs_path))
+        return {}
+    end
+    if lines[1] ~= "[Desktop Entry]" then
+        dbgerr("Attempted to parse invalid desktop entry (invalid header): " .. id .. " at: " .. tostring(abs_path))
+        return {}
+    end
+    local entry_data = {}
+    for i,line in ipairs(lines) do
+        if line:beginswith("[") and line:endswith("]") and i ~= 1 then
+            --end parsing, its non standard from now on
+            break
+        end
+        for k,v in line:gmatch("(%w+)=(.+)") do
+            entry_data[k] = v
+        end
+    end
+    return {
+        id = id,
+        path = abs_path,
+        data = entry_data
+    }
+end
+
+local get_launch_command = function (entry)
+    local entry_data = entry.data
+    if entry_data["TryExec"] ~= nil then
+        local tryExec = entry_data["TryExec"]
+        
+    end
+    if entry_data["DBusActivatable"] then
+        return {
+            file_prefix = "'file://",
+            file_suffix = "' ",
+            prefix = "gdbus call --session --dest \""..entry.id:gsub(".desktop", "").."\" --object-path \""..desktop_id_to_dbus(entry.id).."\" --method \"org.freedesktop.Application.Open\" \"[",
+            op = "%F",
+            suffix = "]\" \"{'desktop-startup-id':<'"..os.getenv("DESKTOP_STARTUP_ID").."'>,'activation-token':<'"..os.getenv("XDG_ACTIVATION_TOKEN").."'>}"
+        }
+    else
+        local exec_command = entry_data["Exec"]
+        if (entry_data["Icon"] ~= nil) then
+            exec_command = exec_command:gsub("%%i", "--icon "..entry_data["Icon"])
+        else
+            exec_command = exec_command:gsub("%%i", "")
+        end
+        --meant to translate, but honestly not dealing with that
+        exec_command = exec_command:gsub("%%c", entry_data["Name"])
+        exec_command = exec_command:gsub("%%k", entry.abs_path)
+        local prefix, op, suffix = exec_command:gmatch("(.-)(%%[uUfF])(.*)")
+        return {
+            file_prefix = "",
+            file_suffix = "",
+            prefix = prefix,
+            op = op,
+            suffix = suffix
+        }
+    end
+end
+
+local launch_command_to_command = function(launch_command, files)
+    if launch_command == {} then return {} end
+
+    local prefixes = launch_command.prefix:split(" ")
+    local command = Command(get_nix_command(prefixes[1]))
+    local _, prefix_args = first(prefixes)
+    command = command:args(prefix_args)
+    local launch_files = {}
+    for i,f in ipairs(files) do
+        launch_files[i] = launch_command.file_prefix..tostring(f)..launch_command.file_suffix
+    end
+    if(launch_command.op == "%u" or launch_command.op == "%f") then
+        local file, _ = first(files)
+        launch_files = { file }
+    end
+    command = command:args(launch_files):args(launch_command.suffix:split(" "))
+    return command
+end
+
+local is_valid_entry = function (entry)
+    local data = entry["data"]
+    if data["Type"] ~= "Application" then return false, entry end
+    if data["Name"] == nil then return false, entry end
+    entry["X-parsed-launch_command"] = launch_command_to_command(get_launch_command(entry))
+    return true, entry
+end
+
+local should_show_entry = function (entry)
+    local valid, entry = is_valid_entry(entry)
+    if not valid then return false end
+    if entry["X-parsed-launch_command"] == {} then return false end
+    if entry["NoDisplay"] then return false end
+    if entry["Hidden"] then return false end
+    if entry["OnlyShowIn"] ~= nil then
+        local current_desktop = os.getenv("XDG_CURRENT_DESKTOP")
+        local only_shows = entry["OnlyShowIn"]:split(";")
+        local should_show = false
+        for _,v in ipairs(only_shows) do
+            if v == current_desktop then
+                should_show = true
+                break
+            end
+        end
+        if not should_show then
+            return false
+        end
+    end
+    if entry["NotShowIn"] ~= nil then
+        local current_desktop = os.getenv("XDG_CURRENT_DESKTOP")
+        local dont_shows = entry["NotShowIn"]:split(";")
+        local should_show = true
+        for _,v in ipairs(dont_shows) do
+            if v == current_desktop then
+                should_show = false
+                break
+            end
+        end
+        if not should_show then
+            return false
+        end
+    end
+    --TODO: look for Path and Terminal Keys for launch command
+    --TODO: check the StartupNotify and StartupWMClass Keys for launch command
 end
 
 local update_desktop_entries = ya.sync(function(self, entries)
