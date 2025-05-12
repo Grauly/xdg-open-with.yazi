@@ -61,6 +61,20 @@ function string:split(split)
     return results
 end
 
+function string:escaped_split(split, escape_char)
+    if not self:endswith(split) then
+        self = self .. split
+    end
+    local results = {}
+    for match, leader, delimiter in self:gmatch("(.-)([^" .. escape_char .. "])(" .. split .. ")") do
+        table.insert(results, match..leader)
+        if (delimiter == "") then
+            return results
+        end
+    end
+    return results
+end
+
 function mergeTables(a, b, replace)
     local result = {}
     for k, v in pairs(a) do
