@@ -48,9 +48,9 @@ function string:beginswith(prefix)
 end
 
 function string:split(split)
-    self = self..split
+    self = self .. split
     local results = {}
-    for match, delimiter in self:gmatch("(.-)("..split..")") do
+    for match, delimiter in self:gmatch("(.-)(" .. split .. ")") do
         table.insert(results, match)
         if (delimiter == "") then
             return results
@@ -73,9 +73,9 @@ function mergeTables(a, b, replace)
 end
 
 function first(list)
-  local first = table.unpack(list, 1, 1)
-  local remainder = { table.unpack(list, 2) }
-  return first, remainder
+    local first = table.unpack(list, 1, 1)
+    local remainder = { table.unpack(list, 2) }
+    return first, remainder
 end
 
 local get_files = function(url, opts)
@@ -112,8 +112,8 @@ end
 
 --needs a plugin named "nix-commands" with a database of commands
 local get_nix_command = function(command)
-    if(command:beginswith("/")) then return command end
-    
+    if (command:beginswith("/")) then return command end
+
     local loaded, content = pcall(require, "nix-commands")
     if not loaded then
         ya.err(content)
@@ -145,7 +145,7 @@ local url_to_desktop_id = function(strip_prefix, url)
 end
 
 local desktop_id_to_dbus = function(id)
-    return "/"..id:gsub("%.desktop"):gsub(".", "/")
+    return "/" .. id:gsub("%.desktop"):gsub(".", "/")
 end
 
 local collect_desktop_entries
@@ -194,12 +194,12 @@ local parse_desktop_entry = function(id, abs_path)
         return {}
     end
     local entry_data = {}
-    for i,line in ipairs(lines) do
+    for i, line in ipairs(lines) do
         if line:beginswith("[") and line:endswith("]") and i ~= 1 then
             --end parsing, its non standard from now on
             break
         end
-        for k,v in line:gmatch("(%w+)=(.+)") do
+        for k, v in line:gmatch("(%w+)=(.+)") do
             entry_data[k] = v
         end
     end
@@ -210,24 +210,27 @@ local parse_desktop_entry = function(id, abs_path)
     }
 end
 
-local get_launch_command = function (entry)
+local get_launch_command = function(entry)
     local entry_data = entry.data
     if entry_data["TryExec"] ~= nil then
         local tryExec = entry_data["TryExec"]
-        
     end
     if entry_data["DBusActivatable"] then
         return {
             file_prefix = "'file://",
             file_suffix = "' ",
-            prefix = "gdbus call --session --dest \""..entry.id:gsub(".desktop", "").."\" --object-path \""..desktop_id_to_dbus(entry.id).."\" --method \"org.freedesktop.Application.Open\" \"[",
+            prefix = "gdbus call --session --dest \"" ..
+            entry.id:gsub(".desktop", "") ..
+            "\" --object-path \"" .. desktop_id_to_dbus(entry.id) ..
+            "\" --method \"org.freedesktop.Application.Open\" \"[",
             op = "%F",
-            suffix = "]\" \"{'desktop-startup-id':<'"..os.getenv("DESKTOP_STARTUP_ID").."'>,'activation-token':<'"..os.getenv("XDG_ACTIVATION_TOKEN").."'>}"
+            suffix = "]\" \"{'desktop-startup-id':<'" ..
+            os.getenv("DESKTOP_STARTUP_ID") .. "'>,'activation-token':<'" .. os.getenv("XDG_ACTIVATION_TOKEN") .. "'>}"
         }
     else
         local exec_command = entry_data["Exec"]
         if (entry_data["Icon"] ~= nil) then
-            exec_command = exec_command:gsub("%%i", "--icon "..entry_data["Icon"])
+            exec_command = exec_command:gsub("%%i", "--icon " .. entry_data["Icon"])
         else
             exec_command = exec_command:gsub("%%i", "")
         end
@@ -253,10 +256,10 @@ local launch_command_to_command = function(launch_command, files)
     local _, prefix_args = first(prefixes)
     command = command:args(prefix_args)
     local launch_files = {}
-    for i,f in ipairs(files) do
-        launch_files[i] = launch_command.file_prefix..tostring(f)..launch_command.file_suffix
+    for i, f in ipairs(files) do
+        launch_files[i] = launch_command.file_prefix .. tostring(f) .. launch_command.file_suffix
     end
-    if(launch_command.op == "%u" or launch_command.op == "%f") then
+    if (launch_command.op == "%u" or launch_command.op == "%f") then
         local file, _ = first(files)
         launch_files = { file }
     end
@@ -282,7 +285,7 @@ local should_show_entry = function (entry)
         local current_desktop = os.getenv("XDG_CURRENT_DESKTOP")
         local only_shows = entry["OnlyShowIn"]:split(";")
         local should_show = false
-        for _,v in ipairs(only_shows) do
+        for _, v in ipairs(only_shows) do
             if v == current_desktop then
                 should_show = true
                 break
@@ -296,7 +299,7 @@ local should_show_entry = function (entry)
         local current_desktop = os.getenv("XDG_CURRENT_DESKTOP")
         local dont_shows = entry["NotShowIn"]:split(";")
         local should_show = true
-        for _,v in ipairs(dont_shows) do
+        for _, v in ipairs(dont_shows) do
             if v == current_desktop then
                 should_show = false
                 break
