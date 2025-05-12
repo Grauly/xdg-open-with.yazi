@@ -48,7 +48,9 @@ function string:beginswith(prefix)
 end
 
 function string:split(split)
-    self = self .. split
+    if not self:endswith(split) then
+        self = self .. split
+    end
     local results = {}
     for match, delimiter in self:gmatch("(.-)(" .. split .. ")") do
         table.insert(results, match)
