@@ -119,13 +119,9 @@ local get_file = function(location)
     if not exists_file(location) then
         return {}
     end
-    local file = io.open(location, "r")
     local lines = {}
-    if file then
-        for line in io.lines(file) do
-            lines[#lines + 1] = line
-        end
-        file:close()
+    for line in io.lines(location) do
+        lines[#lines + 1] = line
     end
     return lines
 end
