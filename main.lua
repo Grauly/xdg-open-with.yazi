@@ -67,7 +67,7 @@ function string:escaped_split(split, escape_char)
     end
     local results = {}
     for match, leader, delimiter in self:gmatch("(.-)([^" .. escape_char .. "])(" .. split .. ")") do
-        table.insert(results, match..leader)
+        table.insert(results, match .. leader)
         if (delimiter == "") then
             return results
         end
@@ -149,6 +149,8 @@ end
 
 --end of utils section
 
+--desktop entry file operations
+
 local retrieve_data_dirs = function()
     return os.getenv("XDG_DATA_DIRS"):split(":")
 end
@@ -200,23 +202,23 @@ end
 
 --desktop entry parsing operations
 
-local retrieve_desktop_entry_value = function (entry_lines_list, key)
-    local search_pattern = key.."=(.*)";
-    for _,v in entry_lines_list do
-        local _,_,found_key, found_value = v:find(search_pattern)
+local retrieve_desktop_entry_value = function(entry_lines_list, key)
+    local search_pattern = key .. "=(.*)";
+    for _, v in entry_lines_list do
+        local _, _, found_key, found_value = v:find(search_pattern)
         return found_value
     end
     return nil
 end
 
-local retrieve_localized_desktop_entry_value = function (entry_lines_list, key)
+local retrieve_localized_desktop_entry_value = function(entry_lines_list, key)
     local base = retrieve_desktop_entry_value(entry_lines_list, key)
     if base == nil then return nil end
     local result = {}
     result["base"] = base
-    local search_pattern = key.."[(.-)]=(.*)";
-    for _,v in entry_lines_list do
-        local _,_,found_key, found_value = v:find(search_pattern)
+    local search_pattern = key .. "[(.-)]=(.*)";
+    for _, v in entry_lines_list do
+        local _, _, found_key, found_value = v:find(search_pattern)
         result[found_key] = found_value
     end
     return result
@@ -251,8 +253,17 @@ end
 local parse_desktop_entry_locale_string = function(entry_lines_list, key)
     local raw = retrieve_localized_desktop_entry_value(entry_lines_list, key)
     if raw == nil then return nil end
-    for k,v in pairs(raw) do
+    for k, v in pairs(raw) do
         raw[k] = parse_desktop_entry_string_raw(v)
+    end
+    return raw
+end
+
+local parse_desktop_entry_locale_string_list = function(entry_lines_list, key)
+    local raw = retrieve_localized_desktop_entry_value(entry_lines_list, key)
+    if raw == nil then return nil end
+    for k, v in pairs(raw) do
+        raw[k] = parse_desktop_entry_string_list(v)
     end
     return raw
 end
@@ -276,30 +287,112 @@ local parse_desktop_entry_numeric = function(entry_lines_list, key)
     return tonumber(raw)
 end
 
-local parse_desktop_entry = function(id, abs_path)
+local parse_desktop_entry_key = function(entry_lines_list, data, key, type)
+    if type == "s" then
+        data[key] = parse_desktop_entry_string(entry_lines_list, key)
+    elseif type == "l" then
+        data[key] = parse_desktop_entry_string_list(entry_lines_list, key)
+    elseif type == "ls" then
+        data[key] = parse_desktop_entry_locale_string(entry_lines_list, key)
+    elseif type == "lsl" then
+        data[key] = parse_desktop_entry_locale_string_list(entry_lines_list, key)
+    elseif type == "i" then
+        data[key] = parse_desktop_entry_iconstring(entry_lines_list, key)
+    elseif type == "b" then
+        data[key] = parse_desktop_entry_boolean(entry_lines_list, key)
+    elseif type == "n" then
+        data[key] = parse_desktop_entry_numeric(entry_lines_list, key)
+    else
+        dbgerr("attempted to parse a unknown type: "..type.." for key: "..key)
+    end
+end
+
+local parse_desktop_entry = function(desktop_entry_lines)
+    local data = {}
+    parse_desktop_entry_key(desktop_entry_lines, data, "Type", "s")
+    parse_desktop_entry_key(desktop_entry_lines, data, "Version", "s")
+    parse_desktop_entry_key(desktop_entry_lines, data, "Name", "ls")
+    parse_desktop_entry_key(desktop_entry_lines, data, "GenericName", "ls")
+    parse_desktop_entry_key(desktop_entry_lines, data, "NoDisplay", "b")
+    parse_desktop_entry_key(desktop_entry_lines, data, "Comment", "ls")
+    parse_desktop_entry_key(desktop_entry_lines, data, "Icon", "i")
+    parse_desktop_entry_key(desktop_entry_lines, data, "Hidden", "b")
+    parse_desktop_entry_key(desktop_entry_lines, data, "OnlyShowIn", "l")
+    parse_desktop_entry_key(desktop_entry_lines, data, "NotShowIn", "l")
+    parse_desktop_entry_key(desktop_entry_lines, data, "DBusActivatable", "b")
+    parse_desktop_entry_key(desktop_entry_lines, data, "TryExec", "s")
+    parse_desktop_entry_key(desktop_entry_lines, data, "Exec", "s")
+    parse_desktop_entry_key(desktop_entry_lines, data, "Path", "s")
+    parse_desktop_entry_key(desktop_entry_lines, data, "Terminal", "b")
+    parse_desktop_entry_key(desktop_entry_lines, data, "Actions", "l") --TODO: parse the actual actions
+    parse_desktop_entry_key(desktop_entry_lines, data, "MimeType", "l")
+    parse_desktop_entry_key(desktop_entry_lines, data, "Categories", "l")
+    parse_desktop_entry_key(desktop_entry_lines, data, "Implements", "l")
+    parse_desktop_entry_key(desktop_entry_lines, data, "Keywords", "lsl")
+    parse_desktop_entry_key(desktop_entry_lines, data, "StartupNotify", "b")
+    parse_desktop_entry_key(desktop_entry_lines, data, "StartupWMClass", "s")
+    parse_desktop_entry_key(desktop_entry_lines, data, "URL", "s")
+    parse_desktop_entry_key(desktop_entry_lines, data, "PrefersNonDefaultGPU", "b")
+    parse_desktop_entry_key(desktop_entry_lines, data, "SingleMainWindow", "b")
+    return data
+end
+
+local parse_desktop_entry_action = function(action_name, entry_data)
+    local header = "Desktop Action "..action_name
+    local raw_action = entry_data[header]
+    local action_data = {}
+    parse_desktop_entry_key(raw_action, action_data, "Name", "s")
+    parse_desktop_entry_key(raw_action, action_data, "Icon", "i")
+    parse_desktop_entry_key(raw_action, action_data, "Exec", "s")
+    return action_data
+end
+
+local parse_desktop_entry_actions = function(spec_data, entry_data)
+    local action_names = spec_data["Actions"]
+    local actions = {}
+    for _,v in ipairs(action_names) do
+        actions[v] = parse_desktop_entry_action(v, entry_data)
+    end
+    return actions
+end
+
+local read_desktop_entry = function(id, abs_path)
     local lines = get_file(abs_path)
     if (next(lines) == nil) then
         dbgerr("Attempted to read empty desktop entry: " .. id .. " at: " .. tostring(abs_path))
         return {}
     end
-    if lines[1] ~= "[Desktop Entry]" then
+    local actual_lines = {}
+    --erase all non actual data
+    for _, v in ipairs(lines) do
+        if v == "" then goto continue end
+        if v:beginswith("#") then goto continue end
+        table.insert(actual_lines, v)
+        ::continue::
+    end
+    --parse to groups
+    if actual_lines[1] ~= "[Desktop Entry]" then
         dbgerr("Attempted to parse invalid desktop entry (invalid header): " .. id .. " at: " .. tostring(abs_path))
         return {}
     end
     local entry_data = {}
-    for i, line in ipairs(lines) do
-        if line:beginswith("[") and line:endswith("]") and i ~= 1 then
-            --end parsing, its non standard from now on
-            break
+    local current_group = ""
+    for _, line in ipairs(actual_lines) do
+        local find, name = line:find("%[(.*)%]")
+        if find == 1 then
+            current_group = name
+            entry_data[name] = {}
         end
-        for k, v in line:gmatch("(%w+)=(.+)") do
-            entry_data[k] = v
-        end
+        entry_data[current_group]:insert(line)
     end
+    local spec_data = parse_desktop_entry(entry_data["Desktop Entry"])
+    local actions = parse_desktop_entry_actions(spec_data, entry_data)
     return {
         id = id,
         path = abs_path,
-        data = entry_data
+        data = spec_data,
+        actions = actions,
+        raw_data = entry_data
     }
 end
 
@@ -313,12 +406,13 @@ local get_launch_command = function(entry)
             file_prefix = "'file://",
             file_suffix = "' ",
             prefix = "gdbus call --session --dest \"" ..
-            entry.id:gsub(".desktop", "") ..
-            "\" --object-path \"" .. desktop_id_to_dbus(entry.id) ..
-            "\" --method \"org.freedesktop.Application.Open\" \"[",
+                entry.id:gsub(".desktop", "") ..
+                "\" --object-path \"" .. desktop_id_to_dbus(entry.id) ..
+                "\" --method \"org.freedesktop.Application.Open\" \"[",
             op = "%F",
             suffix = "]\" \"{'desktop-startup-id':<'" ..
-            os.getenv("DESKTOP_STARTUP_ID") .. "'>,'activation-token':<'" .. os.getenv("XDG_ACTIVATION_TOKEN") .. "'>}"
+                os.getenv("DESKTOP_STARTUP_ID") ..
+                "'>,'activation-token':<'" .. os.getenv("XDG_ACTIVATION_TOKEN") .. "'>}"
         }
     else
         local exec_command = entry_data["Exec"]
@@ -360,18 +454,57 @@ local launch_command_to_command = function(launch_command, files)
     return command
 end
 
-local is_valid_entry = function (entry)
+local parse_string_to_command = function(command_string, files)
+    local args = {}
+    command_string = command_string .. "\\\"\\\""
+    for regular, escaped, addenda in command_string:gmatch("(.-)\\\"(.-)([^\\])\\\"") do
+        table.insert(args, regular)
+        escaped = (escaped .. addenda):gsub("\\([\"])", "%1")
+    end
+    local pieces = command_string:split(" ")
+    local first, rest = first(pieces)
+    local args = {}
+    for _, v in ipairs(rest) do
+        if v:beginswith("%") then
+            --todo handle the expansions and unescapes
+            if (v:find("\\\"(.+)\\\"")) then
+
+            end
+        end
+    end
+    return Command(get_nix_command(first)):args(args)
+end
+
+local basic_exec_check = function(entry)
+    local data = entry["data"]
+    if data["TryExec"] ~= nil then
+        local try_command = parse_string_to_command(data["TryExec"])
+        local status, err = try_command:stdout(Command.PIPED):status()
+        if (err) then
+            return false
+        end
+        if status.success and status.code == 0 then
+            return true
+        end
+    end
+    if data["DBusActivatable"] == true then
+        --we just pray, basically
+        return true
+    else
+        return data["Exec"] ~= nil
+    end
+end
+
+local is_valid_entry = function(entry)
     local data = entry["data"]
     if data["Type"] ~= "Application" then return false, entry end
     if data["Name"] == nil then return false, entry end
-    entry["X-parsed-launch_command"] = launch_command_to_command(get_launch_command(entry))
-    return true, entry
+    return true
 end
 
-local should_show_entry = function (entry)
-    local valid, entry = is_valid_entry(entry)
+local should_show_entry = function(entry)
+    local valid = is_valid_entry(entry)
     if not valid then return false end
-    if entry["X-parsed-launch_command"] == {} then return false end
     if entry["NoDisplay"] then return false end
     if entry["Hidden"] then return false end
     if entry["OnlyShowIn"] ~= nil then
@@ -403,7 +536,6 @@ local should_show_entry = function (entry)
         end
     end
     --TODO: look for Path and Terminal Keys for launch command
-    --TODO: check the StartupNotify and StartupWMClass Keys for launch command
 end
 
 local update_desktop_entries = ya.sync(function(self, entries)
