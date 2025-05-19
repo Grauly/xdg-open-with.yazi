@@ -108,6 +108,7 @@ local exists_file = function(location)
         location = tostring(location)
     end
     local file = io.open(location, "rb")
+    if file then file:close() end
     return file ~= nil
 end
 
@@ -120,8 +121,11 @@ local get_file = function(location)
     end
     local file = io.open(location, "r")
     local lines = {}
-    for line in io.lines(file) do
-        lines[#lines + 1] = line
+    if file then
+        for line in io.lines(file) do
+            lines[#lines + 1] = line
+        end
+        file:close()
     end
     return lines
 end
