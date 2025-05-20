@@ -242,8 +242,7 @@ local parse_desktop_entry_string = function(entry_lines_list, key)
     return parse_desktop_entry_string_raw(retrieve_desktop_entry_value(entry_lines_list, key))
 end
 
-local parse_desktop_entry_string_list = function(entry_lines_list, key)
-    local raw = retrieve_desktop_entry_value(entry_lines_list, key)
+local parse_desktop_entry_string_list_raw = function(raw)
     if raw == nil then return nil end
     local splits = raw:escaped_split(";", "\\")
     local strings = {}
@@ -252,6 +251,10 @@ local parse_desktop_entry_string_list = function(entry_lines_list, key)
         table.insert(strings, parse_desktop_entry_string_raw(split))
     end
     return strings
+end
+
+local parse_desktop_entry_string_list = function(entry_lines_list, key)
+    return parse_desktop_entry_string_list_raw(retrieve_desktop_entry_value(entry_lines_list, key))
 end
 
 local parse_desktop_entry_locale_string = function(entry_lines_list, key)
@@ -267,7 +270,7 @@ local parse_desktop_entry_locale_string_list = function(entry_lines_list, key)
     local raw = retrieve_localized_desktop_entry_value(entry_lines_list, key)
     if raw == nil then return nil end
     for k, v in pairs(raw) do
-        raw[k] = parse_desktop_entry_string_list(v)
+        raw[k] = parse_desktop_entry_string_list_raw(v)
     end
     return raw
 end
@@ -307,7 +310,7 @@ local parse_desktop_entry_key = function(entry_lines_list, data, key, type)
     elseif type == "n" then
         data[key] = parse_desktop_entry_numeric(entry_lines_list, key)
     else
-        dbgerr("attempted to parse a unknown type: "..type.." for key: "..key)
+        dbgerr("attempted to parse a unknown type: " .. type .. " for key: " .. key)
     end
 end
 
