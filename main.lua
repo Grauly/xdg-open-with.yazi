@@ -97,7 +97,7 @@ end
 local get_files = function(url, opts)
     local files, err = fs.read_dir(url, opts)
     if err then
-        dbgerr("Error accessing: " .. dump(url) .. " : " .. dump(err))
+        --dbgerr("Error accessing: " .. dump(url) .. " : " .. dump(err))
         return {}
     end
     return files
