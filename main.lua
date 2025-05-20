@@ -380,7 +380,8 @@ local read_desktop_entry = function(id, abs_path)
     end
     --parse to groups
     if actual_lines[1] ~= "[Desktop Entry]" then
-        dbgerr("Attempted to parse invalid desktop entry (invalid header): " .. id .. " at: " .. tostring(abs_path))
+        dbgerr("Attempted to parse invalid desktop entry (invalid header): " ..
+            id .. " at: " .. tostring(abs_path) .. " with header: " .. actual_lines[1])
         return {}
     end
     local entry_data = {}
