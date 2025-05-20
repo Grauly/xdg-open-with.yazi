@@ -218,7 +218,7 @@ local retrieve_localized_desktop_entry_value = function(entry_lines_list, key)
     if base == nil then return nil end
     local result = {}
     result["base"] = base
-    local search_pattern = key .. "[(.-)]=(.*)";
+    local search_pattern = key .. "%[(.-)%]=(.*)";
     for _, v in ipairs(entry_lines_list) do
         local start, _, found_key, found_value = v:find(search_pattern)
         if start == 1 then
