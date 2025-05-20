@@ -345,7 +345,7 @@ local parse_desktop_entry = function(desktop_entry_lines)
 end
 
 local parse_desktop_entry_action = function(action_name, entry_data)
-    local header = "Desktop Action "..action_name
+    local header = "Desktop Action " .. action_name
     local raw_action = entry_data[header]
     local action_data = {}
     parse_desktop_entry_key(raw_action, action_data, "Name", "s")
@@ -356,8 +356,9 @@ end
 
 local parse_desktop_entry_actions = function(spec_data, entry_data)
     local action_names = spec_data["Actions"]
+    if action_names == nil then return nil end
     local actions = {}
-    for _,v in ipairs(action_names) do
+    for _, v in ipairs(action_names) do
         actions[v] = parse_desktop_entry_action(v, entry_data)
     end
     return actions
