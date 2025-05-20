@@ -549,8 +549,11 @@ end
 
 local update_desktop_entries = ya.sync(function(self, entries)
     local raw_display_entries = {}
-    for k, _ in pairs(entries) do
-        raw_display_entries[#raw_display_entries + 1] = k
+    for k, v in pairs(entries) do
+        raw_display_entries[#raw_display_entries + 1] = {
+            id = k,
+            name = v.data["Name"]["base"]
+        }
     end
     self.desktop_entries = raw_display_entries
     ya.render()
@@ -620,7 +623,11 @@ local M = {
 function M:entry(job)
     open_ui_if_not_open()
     local entries = find_all_desktop_entries()
-    update_desktop_entries(entries)
+    local parsed_entries = {}
+    for k, v in pairs(entries) do
+        parsed_entries[k] = read_desktop_entry(k, tostring(v))
+    end
+    update_desktop_entries(parsed_entries)
     self.user_input(self)
 end
 
@@ -679,7 +686,7 @@ end
 function M:redraw()
     local rows = {}
     for k, v in pairs(self.desktop_entries) do
-        rows[k] = ui.Row { v, "" }
+        rows[k] = ui.Row { v.name, v.id }
     end
     -- basically stolen from https://github.com/yazi-rs/plugins/blob/a1738e8088366ba73b33da5f45010796fb33221e/mount.yazi/main.lua#L144
     return {
@@ -691,12 +698,12 @@ function M:redraw()
             :title(ui.Line("XDG-Mimetype"):align(ui.Line.CENTER)),
         ui.Table(rows)
             :area(self.draw_area:pad(ui.Pad(1, 2, 1, 2)))
-            :header(ui.Row({ "Dir?", "name" }):style(ui.Style():bold()))
+            :header(ui.Row({ "Name", "id" }):style(ui.Style():bold()))
             :row(self.cursor)
             :row_style(ui.Style():fg("blue"):underline())
             :widths {
-                ui.Constraint.Percentage(90),
-                ui.Constraint.Percentage(10),
+                ui.Constraint.Percentage(80),
+                ui.Constraint.Percentage(20),
             },
     }
 end
