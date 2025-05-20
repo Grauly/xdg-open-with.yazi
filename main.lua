@@ -204,9 +204,11 @@ end
 
 local retrieve_desktop_entry_value = function(entry_lines_list, key)
     local search_pattern = key .. "=(.*)";
-    for _, v in entry_lines_list do
-        local _, _, found_key, found_value = v:find(search_pattern)
-        return found_value
+    for _, v in ipairs(entry_lines_list) do
+        local start, _, found_value = v:find(search_pattern)
+        if start == 1 then
+            return found_value
+        end
     end
     return nil
 end
@@ -217,9 +219,11 @@ local retrieve_localized_desktop_entry_value = function(entry_lines_list, key)
     local result = {}
     result["base"] = base
     local search_pattern = key .. "[(.-)]=(.*)";
-    for _, v in entry_lines_list do
-        local _, _, found_key, found_value = v:find(search_pattern)
-        result[found_key] = found_value
+    for _, v in ipairs(entry_lines_list) do
+        local start, _, found_key, found_value = v:find(search_pattern)
+        if start == 1 then
+            result[found_key] = found_value
+        end
     end
     return result
 end
