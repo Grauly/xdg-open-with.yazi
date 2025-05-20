@@ -44,7 +44,7 @@ function string:endswith(suffix)
 end
 
 function string:beginswith(prefix)
-    return self:sub(#prefix) == prefix
+    return self:sub(1, #prefix) == prefix
 end
 
 function string:split(split)
