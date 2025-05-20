@@ -385,12 +385,12 @@ local read_desktop_entry = function(id, abs_path)
     local entry_data = {}
     local current_group = ""
     for _, line in ipairs(actual_lines) do
-        local find, name = line:find("%[(.*)%]")
-        if find == 1 then
-            current_group = name
-            entry_data[name] = {}
+        local start, stop, find = line:find("%[(.*)%]")
+        if start == 1 then
+            current_group = find
+            entry_data[current_group] = {}
         end
-        entry_data[current_group]:insert(line)
+        table.insert(entry_data[current_group], line)
     end
     local spec_data = parse_desktop_entry(entry_data["Desktop Entry"])
     local actions = parse_desktop_entry_actions(spec_data, entry_data)
