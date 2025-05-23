@@ -560,15 +560,37 @@ local update_desktop_entries = ya.sync(function(self, entries)
 end)
 
 --cursor ops
-local update_cursor = ya.sync(function(self, offset)
-    local new_cursor = self.cursor + offset
-    local max_pos = (#self.desktop_entries or 0)
-    if (new_cursor < 0) then
-        self.cursor = 0
-    elseif (new_cursor > max_pos) then
-        self.cursor = max_pos
+local change_tab = ya.sync(function(self, offset)
+    local tab_count = (#self.display_data.files or 0)
+    if tab_count == 0 then
+        self.current_tab = 0
+        self.cursor = {}
+        return
     else
-        self.cursor = new_cursor
+        if self.current_tab == 0 then
+            self.current_tab = 1
+        end
+    end
+    local new_tab = self.current_tab + offset
+    if new_tab > tab_count then return end
+    if new_tab < 1 then return end
+    self.current_tab = new_tab
+end)
+
+local get_cursor_on_tab = ya.sync(function(self)
+    change_tab(0)
+    return self.cursor[self.current_tab] or 0
+end)
+
+local update_cursor_on_tab = ya.sync(function(self, offset)
+    local new_cursor = get_cursor_on_tab() + offset
+    local max_pos = (#(self.display_data.files[self.current_tab].entries or {}))
+    if (new_cursor < 0) then
+        self.cursor[self.current_tab] = 0
+    elseif (new_cursor > max_pos) then
+        self.cursor[self.current_tab] = max_pos
+    else
+        self.cursor[self.current_tab] = new_cursor
     end
 end)
 
@@ -644,9 +666,13 @@ end
 
 function M:act_user_input(action)
     if action == "up" then
-        update_cursor(-1)
+        update_cursor_on_tab(-1)
     elseif action == "down" then
-        update_cursor(1)
+        update_cursor_on_tab(1)
+    elseif action == "prev-file" then
+        change_tab(-1)
+    elseif action == "next-file" then
+        change_tab(1)
     end
 end
 
