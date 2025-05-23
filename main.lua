@@ -750,8 +750,19 @@ function M:layout(area)
             ui.Constraint.Percentage(10)
         })
         :split(h_chunks[2])
+    local areas = ui.Layout()
+        :direction(ui.Layout.VERTICAL)
+        :constraints({
+            ui.Constraint.Length(3),
+            ui.Constraint.Fill(1)
+        })
+        :split(v_chunks[2])
 
-    self.draw_area = v_chunks[2]
+    self.draw_area = {
+        full = v_chunks[2],
+        header = areas[1],
+        list = areas[2]
+    }
 end
 
 function M:reflow()
@@ -760,26 +771,40 @@ end
 
 -- actually draw the content, is synced, so cannot use Command
 function M:redraw()
+    local data = self.display_data.files[self.current_tab] or { file = {}, entries = {} }
     local rows = {}
-    for k, v in pairs(self.desktop_entries) do
-        rows[k] = ui.Row { v.name, v.id }
+    local file_name = (Url(tostring(data.file))).name or "Error"
+    for i, v in ipairs(data.entries) do
+        local entry = (self.display_data.entries[v] or {}).data
+        rows[i] = ui.Row { "", (entry["Name"]["base"] or "undefined"), "" }
     end
     -- basically stolen from https://github.com/yazi-rs/plugins/blob/a1738e8088366ba73b33da5f45010796fb33221e/mount.yazi/main.lua#L144
     return {
-        ui.Clear(self.draw_area),
+        ui.Clear(self.draw_area.full),
         ui.Border(ui.Border.ALL)
-            :area(self.draw_area)
+            :area(self.draw_area.full)
             :type(ui.Border.ROUNDED)
             :style(ui.Style():fg("blue"))
-            :title(ui.Line("XDG-Mimetype"):align(ui.Line.CENTER)),
+            :title(ui.Line("Open with: " .. tostring(self.current_tab) .. "/" .. tostring((#self.display_data.files or 0))):align(ui.Line.LEFT)),
+        ui.Text(file_name)
+            :align(ui.Text.LEFT)
+            :area(self.draw_area.header:pad(ui.Pad(1, 2, 0, 2))),
+        ui.Border(ui.Border.BOTTOM)
+            :area(self.draw_area.header:pad(ui.Pad.x(1)))
+            :type(ui.Border.PLAIN)
+            :style(ui.Style():fg("blue")),
+        ui.Text("Program")
+            :align(ui.Text.LEFT)
+            :area(self.draw_area.list:pad(ui.Pad.x(1)))
+            :style(ui.Style():bold()),
         ui.Table(rows)
-            :area(self.draw_area:pad(ui.Pad(1, 2, 1, 2)))
-            :header(ui.Row({ "Name", "id" }):style(ui.Style():bold()))
-            :row(self.cursor)
-            :row_style(ui.Style():fg("blue"):underline())
+            :area(self.draw_area.list:pad(ui.Pad(1, 2, 1, 2)))
+            :row(get_cursor_on_tab())
+            :row_style(ui.Style():fg("blue"):reverse())
             :widths {
-                ui.Constraint.Percentage(80),
-                ui.Constraint.Percentage(20),
+                ui.Constraint.Percentage(5),
+                ui.Constraint.Percentage(85),
+                ui.Constraint.Percentage(10),
             },
     }
 end
