@@ -1,9 +1,9 @@
-local header_name = "xdg-open-with"
-local log_prefix = "[" .. header_name .. "] "
+local plugin_name = "xdg-open-with"
+local log_prefix = "[" .. plugin_name .. "] "
 
 local notify = function(content, level)
     ya.notify {
-        title = header_name,
+        title = plugin_name,
         content = content,
         level = level,
         timeout = 5
@@ -36,6 +36,16 @@ function dump(o)
         return s .. '} '
     else
         return tostring(o)
+    end
+end
+
+local import = function(file)
+    local home = os.getenv("HOME")
+    local cfg_path = (os.getenv("YAZI_CONFIG_PATH") or ".config/yazi/plugins")
+    local path = home .. "/" .. cfg_path .. "/" .. plugin_name .. ".yazi/" .. file
+    local success, value = pcall(dofile, path)
+    if not success then
+        dbgerr(value)
     end
 end
 
@@ -688,6 +698,7 @@ local M = {
 
 --entry point, async
 function M:entry(job)
+    import("import.lua")
     if (job.args[1] == "refresh") then
         refresh()
         return
