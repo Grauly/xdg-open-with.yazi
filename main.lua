@@ -547,17 +547,43 @@ local should_show_entry = function(entry)
     --TODO: look for Path and Terminal Keys for launch command
 end
 
-local update_desktop_entries = ya.sync(function(self, entries)
-    local raw_display_entries = {}
-    for k, v in pairs(entries) do
-        raw_display_entries[#raw_display_entries + 1] = {
-            id = k,
-            name = v.data["Name"]["base"]
-        }
-    end
-    self.desktop_entries = raw_display_entries
+local write_display_data = ya.sync(function(self, data)
+    self.display_data = data
+    ya.mgr_emit("plugin", { plugin_name, "refresh" })
     ya.render()
 end)
+
+local update_display_data = function(entries, files)
+    --TODO: find mime types of files
+    --TODO: find matching entries
+    --TODO: make table like this per file:
+    -- return a table of structure:
+    -- {
+    --  entries = { table of id -> actual entry }
+    --  files =  {
+    --      {
+    --          file = { url and name }
+    --          entries = { sorted list of entry ID's}
+    --      }
+    --  }
+    -- }
+    local display_files = {}
+    for index, file in ipairs(files) do
+        local applicable_entries = {}
+        for id, entry in pairs(entries) do
+            --TODO: actual mime type checks
+            table.insert(applicable_entries, id)
+        end
+        table.insert(display_files, {
+            file = file,
+            entries = applicable_entries
+        })
+    end
+    write_display_data({
+        entries = entries,
+        files = display_files
+    })
+end
 
 --cursor ops
 local change_tab = ya.sync(function(self, offset)
@@ -593,6 +619,13 @@ local update_cursor_on_tab = ya.sync(function(self, offset)
         self.cursor[self.current_tab] = new_cursor
     end
 end)
+
+-- main refresh op
+
+local refresh = function()
+    change_tab(0)
+    update_cursor_on_tab(0)
+end
 
 --ui open/close
 local open_ui_if_not_open = ya.sync(function(self)
@@ -635,21 +668,38 @@ local M = {
         sc("<Escape>", "quit"),
         sc("<Up>", "up"),
         sc("<Down>", "down"),
-        sc("<Enter>", "open")
+        sc("<Enter>", "open"),
+        sc("<S-Enter>", "open-in-terminal"),
+        sc("<Left>", "prev-file"),
+        sc("<Right>", "next-file"),
     },
-    cursor = 0,
-    desktop_entries = {}
+    current_tab = 0,
+    cursor = {},
+    display_data = {
+        entries = {},
+        files = {}
+    },
+    draw_area = {
+        full = {},
+        header = {},
+        list = {}
+    }
 }
 
 --entry point, async
 function M:entry(job)
+    if (job.args[1] == "refresh") then
+        refresh()
+        return
+    end
     open_ui_if_not_open()
+    local files = selected_or_hovered()
     local entries = find_all_desktop_entries()
     local parsed_entries = {}
     for k, v in pairs(entries) do
         parsed_entries[k] = read_desktop_entry(k, tostring(v))
     end
-    update_desktop_entries(parsed_entries)
+    update_display_data(parsed_entries, files)
     self.user_input(self)
 end
 
