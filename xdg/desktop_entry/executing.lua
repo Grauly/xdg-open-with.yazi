@@ -1,0 +1,118 @@
+local split_string_to_args = function(command_string)
+    local args = {}
+    command_string = command_string .. "\\\"\\\""
+    for regular, escaped in command_string:gmatch("(.-)\\\"(.-)\\\"") do
+        append(args, regular:split(" "))
+        escaped = escaped:gsub("\\([\\$`])", "%1")
+        table.insert(args, escaped)
+    end
+end
+
+local expand_field_codes = function(args, entry_info, files)
+    local entry = entry_info.data
+    local single_command = {}
+    for _, arg in ipairs(args) do
+        arg = arg:gsub("%%[dDnNvm]", "") --getting rid of deprecated codes
+        arg = arg:gsub("%%%%", "%")
+        arg = arg:gsub("%%i", entry["Icon"])
+        arg = arg:gsub("%%c", entry["Name"]["base"])
+        arg = arg:gsub("%%k", entry_info.path)
+        table.insert(single_command, arg)
+    end
+    for index, arg in ipairs(single_command) do
+        if (arg:find("%%[fu]")) then
+            local returns = {}
+            for _, file in ipairs(files) do
+                local copy = {}
+                for i, c_arg in ipairs(single_command) do
+                    if i == index then
+                        c_arg = c_arg:gsub("%%[fu]", file)
+                    end
+                    table.insert(copy, c_arg)
+                end
+                table.insert(returns, copy)
+            end
+            return returns
+        end
+        if (arg:find("%%[FU]")) then
+            local final_command = {}
+            for i, v in ipairs(single_command) do
+                if i < index then
+                    table.insert(final_command, v)
+                else
+                    break
+                end
+            end
+            for _, file in ipairs(files) do
+                table.insert(final_command, file)
+            end
+            for i, v in ipairs(single_command) do
+                if i > index then
+                    table.insert(final_command, v)
+                else
+                    break
+                end
+            end
+            return { final_command }
+        end
+    end
+    return { single_command }
+end
+
+local open_with_exec = function(entry_info, files)
+    local entry = entry_info.data
+    local parts = split_string_to_args(entry["Exec"])
+    parts[1] = get_nix_command(parts[1])
+    if entry["Terminal"] == true then
+        parts = append({ get_nix_command("xdg-terminal-exec") }, parts)
+    end
+    local results = expand_field_codes(parts, entry, files)
+    for _, v in ipairs(results) do
+        local command, args = first(parts)
+        local _, err = Command(command):args(args):stdin(Command.PIPED):stdout(Command.PIPED):spawn()
+        if err then
+            error(tostring(err))
+            dbgerr("Failed to launch: " .. command .. " with error: " .. tostring(err))
+        end
+    end
+end
+
+local desktop_id_to_dbus = function(id)
+    return "/" .. id:gsub("%.desktop"):gsub(".", "/")
+end
+
+local open_with_dbus = function(entry_info, files)
+    local entry = entry_info.data
+    local file_array = "["
+    for index, file in ipairs(files) do
+        file_array = file_array .. "'" .. file .. "'"
+        if index < #files then
+            file_array = file_array .. " "
+        end
+    end
+    file_array = file_array .. "]"
+    local _, err = Command(get_nix_command("gdbus"))
+        :args({ "call", "--session", "--dest" })
+        :arg("\"" .. entry_info.id:gsub(".desktop", "") .. "\"")
+        :arg("--object-path")
+        :arg("\"" .. desktop_id_to_dbus(entry_info.id) .. "\"")
+        :args({ "--method", "\"org.freedesktop.Application.Open\"", })
+        :arg(file_array)
+        :arg(
+            "\"{'desktop-startup-id':<'" .. os.getenv("DESKTOP_STARTUP_ID") ..
+            "'>,'activation-token':<'" .. os.getenv("XDG_ACTIVATION_TOKEN") .. "'>}"
+        )
+        :stdin(Command.PIPED)
+        :stdout(Command.PIPED)
+        :spawn()
+    if err then
+        error(tostring(err))
+        dbgerr("Failed to dbus launch: " .. desktop_id_to_dbus(entry_info.id) .. " with error: " .. tostring(err))
+    end
+end
+
+--TODO: do TryExec
+
+function execute_desktop_entry(entry_info, files)
+
+end

@@ -45,69 +45,6 @@ import("xdg/desktop_entry/parsing.lua")
 import("xdg/desktop_entry/reading.lua")
 import("xdg/desktop_entry/executing.lua")
 
-local desktop_id_to_dbus = function(id)
-    return "/" .. id:gsub("%.desktop"):gsub(".", "/")
-end
-
-local get_launch_command = function(entry)
-    local entry_data = entry.data
-    if entry_data["TryExec"] ~= nil then
-        local tryExec = entry_data["TryExec"]
-    end
-    if entry_data["DBusActivatable"] then
-        return {
-            file_prefix = "'file://",
-            file_suffix = "' ",
-            prefix = "gdbus call --session --dest \"" ..
-                entry.id:gsub(".desktop", "") ..
-                "\" --object-path \"" .. desktop_id_to_dbus(entry.id) ..
-                "\" --method \"org.freedesktop.Application.Open\" \"[",
-            op = "%F",
-            suffix = "]\" \"{'desktop-startup-id':<'" ..
-                os.getenv("DESKTOP_STARTUP_ID") ..
-                "'>,'activation-token':<'" .. os.getenv("XDG_ACTIVATION_TOKEN") .. "'>}"
-        }
-    else
-        local exec_command = entry_data["Exec"]
-        if (entry_data["Icon"] ~= nil) then
-            exec_command = exec_command:gsub("%%i", "--icon " .. entry_data["Icon"])
-        else
-            exec_command = exec_command:gsub("%%i", "")
-        end
-        --meant to translate, but honestly not dealing with that
-        exec_command = exec_command:gsub("%%c", entry_data["Name"])
-        exec_command = exec_command:gsub("%%k", entry.abs_path)
-        local prefix, op, suffix = exec_command:gmatch("(.-)(%%[uUfF])(.*)")
-        return {
-            file_prefix = "",
-            file_suffix = "",
-            prefix = prefix,
-            op = op,
-            suffix = suffix
-        }
-    end
-end
-
-local launch_command_to_command = function(launch_command, files)
-    if launch_command == {} then return {} end
-
-    local prefixes = launch_command.prefix:split(" ")
-    local command = Command(get_nix_command(prefixes[1]))
-    local _, prefix_args = first(prefixes)
-    command = command:args(prefix_args)
-    local launch_files = {}
-    for i, f in ipairs(files) do
-        launch_files[i] = launch_command.file_prefix .. tostring(f) .. launch_command.file_suffix
-    end
-    if (launch_command.op == "%u" or launch_command.op == "%f") then
-        local file, _ = first(files)
-        launch_files = { file }
-    end
-    command = command:args(launch_files):args(launch_command.suffix:split(" "))
-    return command
-end
-
-
 local basic_exec_check = function(entry)
     local data = entry["data"]
     if data["TryExec"] ~= nil then
