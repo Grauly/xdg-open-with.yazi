@@ -1,140 +1,21 @@
-local plugin_name = "xdg-open-with"
-local log_prefix = "[" .. plugin_name .. "] "
-
-local notify = function(content, level)
-    ya.notify {
-        title = plugin_name,
-        content = content,
-        level = level,
-        timeout = 5
-    }
-end
-
-local info = function(content)
-    notify(content, "info")
-end
-
-local error = function(content)
-    notify(content, "error")
-end
-
-local dbg = function(content)
-    ya.dbg(log_prefix .. content)
-end
-
-local dbgerr = function(content)
-    ya.err(log_prefix .. content)
-end
-
-function dump(o)
-    if type(o) == 'table' then
-        local s = '{ '
-        for k, v in pairs(o) do
-            if type(k) ~= 'number' then k = '"' .. k .. '"' end
-            s = s .. '[' .. k .. '] = ' .. dump(v) .. ','
-        end
-        return s .. '} '
-    else
-        return tostring(o)
-    end
-end
+Plugin_Name = "xdg-open-with"
+Log_Prefix = "[" .. Plugin_Name .. "] "
 
 local import = function(file)
     local home = os.getenv("HOME")
     local cfg_path = (os.getenv("YAZI_CONFIG_PATH") or ".config/yazi/plugins")
-    local path = home .. "/" .. cfg_path .. "/" .. plugin_name .. ".yazi/" .. file
+    local path = home .. "/" .. cfg_path .. "/" .. Plugin_Name .. ".yazi/" .. file
     local success, value = pcall(dofile, path)
     if not success then
         dbgerr(value)
     end
 end
 
-function string:endswith(suffix)
-    return self:sub(- #suffix) == suffix
-end
-
-function string:beginswith(prefix)
-    return self:sub(1, #prefix) == prefix
-end
-
-function string:split(split)
-    if not self:endswith(split) then
-        self = self .. split
-    end
-    local results = {}
-    for match, delimiter in self:gmatch("(.-)(" .. split .. ")") do
-        table.insert(results, match)
-        if (delimiter == "") then
-            return results
-        end
-    end
-    return results
-end
-
-function string:escaped_split(split, escape_char)
-    if not self:endswith(split) then
-        self = self .. split
-    end
-    local results = {}
-    for match, leader, delimiter in self:gmatch("(.-)([^" .. escape_char .. "])(" .. split .. ")") do
-        table.insert(results, match .. leader)
-        if (delimiter == "") then
-            return results
-        end
-    end
-    return results
-end
-
-function mergeTables(a, b, replace)
-    local result = {}
-    for k, v in pairs(a) do
-        result[k] = v
-    end
-    for k, v in pairs(b) do
-        if ((result[k] == nil) or (replace)) then
-            result[k] = v
-        end
-    end
-    return result
-end
-
-function first(list)
-    local first = table.unpack(list, 1, 1)
-    local remainder = { table.unpack(list, 2) }
-    return first, remainder
-end
-
-local get_files = function(url, opts)
-    local files, err = fs.read_dir(url, opts)
-    if err then
-        --dbgerr("Error accessing: " .. dump(url) .. " : " .. dump(err))
-        return {}
-    end
-    return files
-end
-
-local exists_file = function(location)
-    if (type(location) ~= "string") then
-        location = tostring(location)
-    end
-    local file = io.open(location, "rb")
-    if file then file:close() end
-    return file ~= nil
-end
-
-local get_file = function(location)
-    if (type(location) ~= "string") then
-        location = tostring(location)
-    end
-    if not exists_file(location) then
-        return {}
-    end
-    local lines = {}
-    for line in io.lines(location) do
-        lines[#lines + 1] = line
-    end
-    return lines
-end
+import("utils/ya.lua")
+import("utils/table.lua")
+import("utils/string.lua")
+import("utils/list.lua")
+import("utils/files.lua")
 
 --needs a plugin named "nix-commands" with a database of commands
 local get_nix_command = function(command)
@@ -142,16 +23,16 @@ local get_nix_command = function(command)
 
     local loaded, content = pcall(require, "nix-commands")
     if not loaded then
-        ya.err(content)
+        err(content)
         return command
     end
     if not content.commands then
-        ya.err("nix-commands does not have a commands section, defaulting")
+        err("nix-commands does not have a commands section, defaulting")
         return command
     end
     local nix_command = content.commands[command]
     if not nix_command then
-        ya.err("nix-commands does not have a \"" .. command .. "\" defined")
+        err("nix-commands does not have a \"" .. command .. "\" defined")
         return command
     end
     return nix_command
@@ -159,260 +40,13 @@ end
 
 --end of utils section
 
---desktop entry file operations
-
-local retrieve_data_dirs = function()
-    return os.getenv("XDG_DATA_DIRS"):split(":")
-end
-
-local url_to_desktop_id = function(strip_prefix, url)
-    local url_string = tostring(url:strip_prefix(strip_prefix))
-    url_string = url_string:gsub("-", "_")
-    url_string = url_string:gsub("/", "-")
-    return url_string
-end
+import("xdg/desktop_entry/file_ops.lua")
+import("xdg/desktop_entry/parsing.lua")
+import("xdg/desktop_entry/reading.lua")
+import("xdg/desktop_entry/executing.lua")
 
 local desktop_id_to_dbus = function(id)
     return "/" .. id:gsub("%.desktop"):gsub(".", "/")
-end
-
-local collect_desktop_entries
-collect_desktop_entries = function(applications_url, search_url)
-    --should be using glob = "*.desktop", but it just does not work
-    local files = get_files(search_url, {})
-    local applications = {}
-    for _, file in ipairs(files) do
-        if (file.cha.is_dir) then
-            local sub_applications = collect_desktop_entries(Url(search_url):join(file.name))
-            applications = mergeTables(applications, sub_applications, false)
-        else
-            --hence, this workaround
-            if file.name:endswith(".desktop") then
-                applications[url_to_desktop_id(applications_url, file.url)] = file.url
-            end
-        end
-    end
-    return applications
-end
-
-local find_desktop_entries = function(dir)
-    local search_location = Url(dir):join("applications")
-    return collect_desktop_entries(search_location, search_location)
-end
-
-local find_all_desktop_entries = function()
-    local data_dirs = retrieve_data_dirs()
-    local desktop_entries = {}
-    for _, v in ipairs(data_dirs) do
-        local entries = find_desktop_entries(v)
-        desktop_entries = mergeTables(desktop_entries, entries, false)
-    end
-    return desktop_entries
-end
-
---desktop entry parsing operations
-
-local retrieve_desktop_entry_value = function(entry_lines_list, key)
-    local search_pattern = key .. "=(.*)";
-    for _, v in ipairs(entry_lines_list) do
-        local start, _, found_value = v:find(search_pattern)
-        if start == 1 then
-            return found_value
-        end
-    end
-    return nil
-end
-
-local retrieve_localized_desktop_entry_value = function(entry_lines_list, key)
-    local base = retrieve_desktop_entry_value(entry_lines_list, key)
-    if base == nil then return nil end
-    local result = {}
-    result["base"] = base
-    local search_pattern = key .. "%[(.-)%]=(.*)";
-    for _, v in ipairs(entry_lines_list) do
-        local start, _, found_key, found_value = v:find(search_pattern)
-        if start == 1 then
-            result[found_key] = found_value
-        end
-    end
-    return result
-end
-
-local parse_desktop_entry_string_raw = function(raw)
-    if raw == nil then return nil end
-    raw = raw:gsub("\\s", " ")
-    raw = raw:gsub("\\n", "\n")
-    raw = raw:gsub("\\t", "\t")
-    raw = raw:gsub("\\r", "\r")
-    raw = raw:gsub("\\\\", "\\")
-    return raw
-end
-
-local parse_desktop_entry_string = function(entry_lines_list, key)
-    return parse_desktop_entry_string_raw(retrieve_desktop_entry_value(entry_lines_list, key))
-end
-
-local parse_desktop_entry_string_list_raw = function(raw)
-    if raw == nil then return nil end
-    local splits = raw:escaped_split(";", "\\")
-    local strings = {}
-    for _, split in ipairs(splits) do
-        split = split:gsub("\\;", ";")
-        table.insert(strings, parse_desktop_entry_string_raw(split))
-    end
-    return strings
-end
-
-local parse_desktop_entry_string_list = function(entry_lines_list, key)
-    return parse_desktop_entry_string_list_raw(retrieve_desktop_entry_value(entry_lines_list, key))
-end
-
-local parse_desktop_entry_locale_string = function(entry_lines_list, key)
-    local raw = retrieve_localized_desktop_entry_value(entry_lines_list, key)
-    if raw == nil then return nil end
-    for k, v in pairs(raw) do
-        raw[k] = parse_desktop_entry_string_raw(v)
-    end
-    return raw
-end
-
-local parse_desktop_entry_locale_string_list = function(entry_lines_list, key)
-    local raw = retrieve_localized_desktop_entry_value(entry_lines_list, key)
-    if raw == nil then return nil end
-    for k, v in pairs(raw) do
-        raw[k] = parse_desktop_entry_string_list_raw(v)
-    end
-    return raw
-end
-
-local parse_desktop_entry_iconstring = function(entry_lines_list, key)
-    --I dont think I will?
-    return nil
-end
-
-local parse_desktop_entry_boolean = function(entry_lines_list, key)
-    local raw = retrieve_desktop_entry_value(entry_lines_list, key)
-    if raw == nil then return nil end
-    if raw == "true" then return true end
-    if raw == "false" then return false end
-    return nil
-end
-
-local parse_desktop_entry_numeric = function(entry_lines_list, key)
-    local raw = retrieve_desktop_entry_value(entry_lines_list, key)
-    if raw == nil then return nil end
-    return tonumber(raw)
-end
-
-local parse_desktop_entry_key = function(entry_lines_list, data, key, type)
-    if type == "s" then
-        data[key] = parse_desktop_entry_string(entry_lines_list, key)
-    elseif type == "l" then
-        data[key] = parse_desktop_entry_string_list(entry_lines_list, key)
-    elseif type == "ls" then
-        data[key] = parse_desktop_entry_locale_string(entry_lines_list, key)
-    elseif type == "lsl" then
-        data[key] = parse_desktop_entry_locale_string_list(entry_lines_list, key)
-    elseif type == "i" then
-        data[key] = parse_desktop_entry_iconstring(entry_lines_list, key)
-    elseif type == "b" then
-        data[key] = parse_desktop_entry_boolean(entry_lines_list, key)
-    elseif type == "n" then
-        data[key] = parse_desktop_entry_numeric(entry_lines_list, key)
-    else
-        dbgerr("attempted to parse a unknown type: " .. type .. " for key: " .. key)
-    end
-end
-
-local parse_desktop_entry = function(desktop_entry_lines)
-    local data = {}
-    parse_desktop_entry_key(desktop_entry_lines, data, "Type", "s")
-    parse_desktop_entry_key(desktop_entry_lines, data, "Version", "s")
-    parse_desktop_entry_key(desktop_entry_lines, data, "Name", "ls")
-    parse_desktop_entry_key(desktop_entry_lines, data, "GenericName", "ls")
-    parse_desktop_entry_key(desktop_entry_lines, data, "NoDisplay", "b")
-    parse_desktop_entry_key(desktop_entry_lines, data, "Comment", "ls")
-    parse_desktop_entry_key(desktop_entry_lines, data, "Icon", "i")
-    parse_desktop_entry_key(desktop_entry_lines, data, "Hidden", "b")
-    parse_desktop_entry_key(desktop_entry_lines, data, "OnlyShowIn", "l")
-    parse_desktop_entry_key(desktop_entry_lines, data, "NotShowIn", "l")
-    parse_desktop_entry_key(desktop_entry_lines, data, "DBusActivatable", "b")
-    parse_desktop_entry_key(desktop_entry_lines, data, "TryExec", "s")
-    parse_desktop_entry_key(desktop_entry_lines, data, "Exec", "s")
-    parse_desktop_entry_key(desktop_entry_lines, data, "Path", "s")
-    parse_desktop_entry_key(desktop_entry_lines, data, "Terminal", "b")
-    parse_desktop_entry_key(desktop_entry_lines, data, "Actions", "l") --TODO: parse the actual actions
-    parse_desktop_entry_key(desktop_entry_lines, data, "MimeType", "l")
-    parse_desktop_entry_key(desktop_entry_lines, data, "Categories", "l")
-    parse_desktop_entry_key(desktop_entry_lines, data, "Implements", "l")
-    parse_desktop_entry_key(desktop_entry_lines, data, "Keywords", "lsl")
-    parse_desktop_entry_key(desktop_entry_lines, data, "StartupNotify", "b")
-    parse_desktop_entry_key(desktop_entry_lines, data, "StartupWMClass", "s")
-    parse_desktop_entry_key(desktop_entry_lines, data, "URL", "s")
-    parse_desktop_entry_key(desktop_entry_lines, data, "PrefersNonDefaultGPU", "b")
-    parse_desktop_entry_key(desktop_entry_lines, data, "SingleMainWindow", "b")
-    return data
-end
-
-local parse_desktop_entry_action = function(action_name, entry_data)
-    local header = "Desktop Action " .. action_name
-    local raw_action = entry_data[header]
-    local action_data = {}
-    parse_desktop_entry_key(raw_action, action_data, "Name", "s")
-    parse_desktop_entry_key(raw_action, action_data, "Icon", "i")
-    parse_desktop_entry_key(raw_action, action_data, "Exec", "s")
-    return action_data
-end
-
-local parse_desktop_entry_actions = function(spec_data, entry_data)
-    local action_names = spec_data["Actions"]
-    if action_names == nil then return nil end
-    local actions = {}
-    for _, v in ipairs(action_names) do
-        actions[v] = parse_desktop_entry_action(v, entry_data)
-    end
-    return actions
-end
-
-local read_desktop_entry = function(id, abs_path)
-    local lines = get_file(abs_path)
-    if (next(lines) == nil) then
-        dbgerr("Attempted to read empty desktop entry: " .. id .. " at: " .. tostring(abs_path))
-        return {}
-    end
-    local actual_lines = {}
-    --erase all non actual data
-    for _, v in ipairs(lines) do
-        if v == "" then goto continue end
-        if v:beginswith("#") then goto continue end
-        table.insert(actual_lines, v)
-        ::continue::
-    end
-    --parse to groups
-    if actual_lines[1] ~= "[Desktop Entry]" then
-        dbgerr("Attempted to parse invalid desktop entry (invalid header): " ..
-            id .. " at: " .. tostring(abs_path) .. " with header: " .. actual_lines[1])
-        return {}
-    end
-    local entry_data = {}
-    local current_group = ""
-    for _, line in ipairs(actual_lines) do
-        local start, stop, find = line:find("%[(.*)%]")
-        if start == 1 then
-            current_group = find
-            entry_data[current_group] = {}
-        end
-        table.insert(entry_data[current_group], line)
-    end
-    local spec_data = parse_desktop_entry(entry_data["Desktop Entry"])
-    local actions = parse_desktop_entry_actions(spec_data, entry_data)
-    return {
-        id = id,
-        path = abs_path,
-        data = spec_data,
-        actions = actions,
-        raw_data = entry_data
-    }
 end
 
 local get_launch_command = function(entry)
@@ -473,26 +107,6 @@ local launch_command_to_command = function(launch_command, files)
     return command
 end
 
-local parse_string_to_command = function(command_string, files)
-    local args = {}
-    command_string = command_string .. "\\\"\\\""
-    for regular, escaped, addenda in command_string:gmatch("(.-)\\\"(.-)([^\\])\\\"") do
-        table.insert(args, regular)
-        escaped = (escaped .. addenda):gsub("\\([\"])", "%1")
-    end
-    local pieces = command_string:split(" ")
-    local first, rest = first(pieces)
-    local args = {}
-    for _, v in ipairs(rest) do
-        if v:beginswith("%") then
-            --todo handle the expansions and unescapes
-            if (v:find("\\\"(.+)\\\"")) then
-
-            end
-        end
-    end
-    return Command(get_nix_command(first)):args(args)
-end
 
 local basic_exec_check = function(entry)
     local data = entry["data"]
@@ -559,7 +173,7 @@ end
 
 local write_display_data = ya.sync(function(self, data)
     self.display_data = data
-    ya.mgr_emit("plugin", { plugin_name, "refresh" })
+    ya.mgr_emit("plugin", { Plugin_Name, "refresh" })
     ya.render()
 end)
 
@@ -698,7 +312,6 @@ local M = {
 
 --entry point, async
 function M:entry(job)
-    import("import.lua")
     if (job.args[1] == "refresh") then
         refresh()
         return
