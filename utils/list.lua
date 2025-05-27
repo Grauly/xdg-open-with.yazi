@@ -9,3 +9,10 @@ function append(list, append)
         table.insert(list, v)
     end
 end
+
+function contains(list, search)
+    for _, v in ipairs(list) do
+        if v == search then return true end
+    end
+    return false
+end
