@@ -75,9 +75,9 @@ local open_with_exec = function(entry_info, files)
     if entry["Terminal"] == true then
         parts = append({ get_nix_command("xdg-terminal-exec") }, parts)
     end
-    local results = expand_field_codes(parts, entry, files)
+    local results = expand_field_codes(parts, entry_info, files)
     for _, v in ipairs(results) do
-        local command, args = first(parts)
+        local command, args = first(v)
         local _, err = Command(command):args(args):stdin(Command.PIPED):stdout(Command.PIPED):spawn()
         if err then
             error(tostring(err))
