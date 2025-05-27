@@ -38,12 +38,12 @@ function get_nix_command(command)
     return nix_command
 end
 
---end of utils section
-
 import("xdg/desktop_entry/file_ops.lua")
 import("xdg/desktop_entry/parsing.lua")
 import("xdg/desktop_entry/reading.lua")
 import("xdg/desktop_entry/executing.lua")
+import("xdg/desktop_entry/filtering.lua")
+import("xdg/desktop_entry/mime_types.lua")
 
 local write_display_data = ya.sync(function(self, data)
     self.display_data = data
@@ -60,26 +60,45 @@ local update_display_data = function(entries, files)
     --  entries = { table of id -> actual entry }
     --  files =  {
     --      {
-    --          file = { url and name }
+    --          mime = mime_type
+    --          files = { sorted list of { url } }
     --          entries = { sorted list of entry ID's}
     --      }
     --  }
     -- }
-    local display_files = {}
-    for index, file in ipairs(files) do
+    table.sort(entries, function(left, right)
+        return left.data["Name"]["base"]:lower() < right.data["Name"]["base"]:lower()
+    end)
+    local sorted_entry_ids = {}
+    for k,_ in pairs(entries) do
+        table.insert(sorted_entry_ids, k)
+    end
+    table.sort(sorted_entry_ids, function(left, right)
+        return entries[left].data["Name"]["base"]:lower() < entries[right].data["Name"]["base"]:lower()
+    end)
+    local mimed_files = get_mime_organized_files(files)
+    for k, mime_sorted_files in pairs(mimed_files) do
+        mime_sorted_files = table.sort(mime_sorted_files, function(left, right)
+            return Url(tostring(left)).name < Url(tostring(right)).name
+        end)
+    end
+    local file_displays = {}
+    for mime_type, mime_sorted_files in pairs(mimed_files) do
         local applicable_entries = {}
-        for id, entry in pairs(entries) do
-            --TODO: actual mime type checks
-            table.insert(applicable_entries, id)
+        for _, entry_id in ipairs(sorted_entry_ids) do
+            if should_show_entry(entries[entry_id].data, mime_type) then
+                table.insert(applicable_entries, entry_id)
+            end
         end
-        table.insert(display_files, {
-            file = file,
+        table.insert(file_displays, {
+            mime = mime_type,
+            files = mime_sorted_files,
             entries = applicable_entries
         })
     end
     write_display_data({
         entries = entries,
-        files = display_files
+        files = file_displays
     })
 end
 
@@ -269,9 +288,15 @@ end
 
 -- actually draw the content, is synced, so cannot use Command
 function M:redraw()
-    local data = self.display_data.files[self.current_tab] or { file = {}, entries = {} }
+    local data = self.display_data.files[self.current_tab] or { mime = "error", files = {}, entries = {} }
     local rows = {}
-    local file_name = (Url(tostring(data.file))).name or "Error"
+    local file_names = ""
+    for index, file in ipairs(data.files) do
+        file_names = file_names .. ((Url(tostring(file))).name or "Error")
+        if index < #data.files then
+            file_names = file_names .. ", "
+        end
+    end
     for i, v in ipairs(data.entries) do
         local entry = (self.display_data.entries[v] or {}).data
         rows[i] = ui.Row { "", (entry["Name"]["base"] or "undefined"), "" }
@@ -283,10 +308,15 @@ function M:redraw()
             :area(self.draw_area.full)
             :type(ui.Border.ROUNDED)
             :style(ui.Style():fg("blue"))
-            :title(ui.Line("Open with: " .. tostring(self.current_tab) .. "/" .. tostring((#self.display_data.files or 0))):align(ui.Line.LEFT)),
-        ui.Text(file_name)
-            :align(ui.Text.LEFT)
-            :area(self.draw_area.header:pad(ui.Pad(1, 2, 0, 2))),
+            :title(ui.Line("Open with: " ..
+            tostring(self.current_tab) .. "/" .. tostring((#self.display_data.files or 0))):align(ui.Line.LEFT)),
+        ui.Table({ ui.Row { file_names, "", data.mime } })
+            :area(self.draw_area.header:pad(ui.Pad(1, 2, 0, 2)))
+            :widths {
+                ui.Constraint.Percentage(85),
+                ui.Constraint.Min(1),
+                ui.Constraint.Percentage(15)
+            },
         ui.Border(ui.Border.BOTTOM)
             :area(self.draw_area.header:pad(ui.Pad.x(1)))
             :type(ui.Border.PLAIN)
