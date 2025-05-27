@@ -1,8 +1,14 @@
 local get_file_mime = function(file)
     local output, err = Command(get_nix_command("xdg-mime"))
         :args({ "query", "filetype", tostring(file) })
+        :stdout(Command.PIPED)
+        :stdin(Command.PIPED)
         :output()
-    return output:gsub("\n","")
+    if err then
+        dbgerr(tostring(err))
+        return "none"
+    end
+    return output.stdout:gsub("\n","")
 end
 
 function get_mime_organized_files(files)
