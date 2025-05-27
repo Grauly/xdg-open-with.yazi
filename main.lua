@@ -45,49 +45,6 @@ import("xdg/desktop_entry/parsing.lua")
 import("xdg/desktop_entry/reading.lua")
 import("xdg/desktop_entry/executing.lua")
 
-local is_valid_entry = function(entry)
-    local data = entry["data"]
-    if data["Type"] ~= "Application" then return false, entry end
-    if data["Name"] == nil then return false, entry end
-    return true
-end
-
-local should_show_entry = function(entry)
-    local valid = is_valid_entry(entry)
-    if not valid then return false end
-    if entry["NoDisplay"] then return false end
-    if entry["Hidden"] then return false end
-    if entry["OnlyShowIn"] ~= nil then
-        local current_desktop = os.getenv("XDG_CURRENT_DESKTOP")
-        local only_shows = entry["OnlyShowIn"]:split(";")
-        local should_show = false
-        for _, v in ipairs(only_shows) do
-            if v == current_desktop then
-                should_show = true
-                break
-            end
-        end
-        if not should_show then
-            return false
-        end
-    end
-    if entry["NotShowIn"] ~= nil then
-        local current_desktop = os.getenv("XDG_CURRENT_DESKTOP")
-        local dont_shows = entry["NotShowIn"]:split(";")
-        local should_show = true
-        for _, v in ipairs(dont_shows) do
-            if v == current_desktop then
-                should_show = false
-                break
-            end
-        end
-        if not should_show then
-            return false
-        end
-    end
-    --TODO: look for Path and Terminal Keys for launch command
-end
-
 local write_display_data = ya.sync(function(self, data)
     self.display_data = data
     ya.mgr_emit("plugin", { Plugin_Name, "refresh" })
