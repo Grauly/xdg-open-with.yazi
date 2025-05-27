@@ -16,10 +16,17 @@ local expand_field_codes = function(args, entry_info, files)
     for _, arg in ipairs(args) do
         arg = arg:gsub("%%[dDnNvm]", "") --getting rid of deprecated codes
         arg = arg:gsub("%%%%", "%")
-        arg = arg:gsub("%%i", entry["Icon"])
         arg = arg:gsub("%%c", entry["Name"]["base"])
-        arg = arg:gsub("%%k", entry_info.path)
+        arg = arg:gsub("%%k", tostring(entry_info.path))
+
+        if arg:find("%%i") then
+            local icon = entry["Icon"]
+            if icon == nil then goto continue end
+            table.insert(single_command, "--icon")
+            table.insert(single_command, entry["Icon"])
+        end
         table.insert(single_command, arg)
+        ::continue::
     end
     for index, arg in ipairs(single_command) do
         if (arg:find("%%[fu]")) then
