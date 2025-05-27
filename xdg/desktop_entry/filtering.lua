@@ -21,6 +21,8 @@ function should_show_entry(entry, mimetype)
     end
     if entry["MimeType"] ~= nil then
         if not contains(entry["MimeType"], mimetype) then return false end
+    else
+        return false
     end
     return true
 end
