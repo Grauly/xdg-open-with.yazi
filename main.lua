@@ -45,26 +45,6 @@ import("xdg/desktop_entry/parsing.lua")
 import("xdg/desktop_entry/reading.lua")
 import("xdg/desktop_entry/executing.lua")
 
-local basic_exec_check = function(entry)
-    local data = entry["data"]
-    if data["TryExec"] ~= nil then
-        local try_command = parse_string_to_command(data["TryExec"])
-        local status, err = try_command:stdout(Command.PIPED):status()
-        if (err) then
-            return false
-        end
-        if status.success and status.code == 0 then
-            return true
-        end
-    end
-    if data["DBusActivatable"] == true then
-        --we just pray, basically
-        return true
-    else
-        return data["Exec"] ~= nil
-    end
-end
-
 local is_valid_entry = function(entry)
     local data = entry["data"]
     if data["Type"] ~= "Application" then return false, entry end

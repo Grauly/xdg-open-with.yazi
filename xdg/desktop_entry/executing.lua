@@ -111,8 +111,23 @@ local open_with_dbus = function(entry_info, files)
     end
 end
 
---TODO: do TryExec
-
 function execute_desktop_entry(entry_info, files)
+    local entry = entry_info.data
+    if entry["DBusActivatable"] then
+        open_with_dbus(entry_info, files)
+    else
+        open_with_exec(entry_info, files)
+    end
+end
 
+function check_exec(entry_info)
+    local entry = entry_info.data
+    if not entry["TryExec"] then return true end
+    local parts = split_string_to_args(entry["TryExec"])
+    local command, args = first(parts)
+    local status, err = Command(command):args(args):stdin(command.PIPED):stdout(command.PIPED):status()
+    if status ~= 0 or err then
+        return false
+    end
+    return true
 end
