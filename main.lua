@@ -45,7 +45,17 @@ import("xdg/desktop_entry/executing.lua")
 import("xdg/desktop_entry/filtering.lua")
 import("xdg/desktop_entry/mime_types.lua")
 
+local clear_display_data = ya.sync(function(self)
+    self.display_data = {
+        entries = {},
+        files = {}
+    }
+    self.cursor = {}
+    self.current_tab = 0
+end)
+
 local write_display_data = ya.sync(function(self, data)
+    clear_display_data()
     self.display_data = data
     ya.mgr_emit("plugin", { Plugin_Name, "refresh" })
     ya.render()
@@ -209,6 +219,7 @@ function M:entry(job)
         refresh()
         return
     end
+    clear_display_data()
     open_ui_if_not_open()
     local files = selected_or_hovered()
     local entries = find_all_desktop_entries()
@@ -288,7 +299,7 @@ end
 
 -- actually draw the content, is synced, so cannot use Command
 function M:redraw()
-    local data = self.display_data.files[self.current_tab] or { mime = "error", files = {}, entries = {} }
+    local data = self.display_data.files[self.current_tab] or { mime = "", files = {}, entries = {} }
     local rows = {}
     local file_names = ""
     for index, file in ipairs(data.files) do
