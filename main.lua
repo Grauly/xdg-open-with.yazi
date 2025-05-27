@@ -45,6 +45,43 @@ import("xdg/desktop_entry/executing.lua")
 import("xdg/desktop_entry/filtering.lua")
 import("xdg/desktop_entry/mime_types.lua")
 
+--cursor ops
+local change_tab = ya.sync(function(self, offset)
+    local tab_count = (#self.display_data.files or 0)
+    if tab_count == 0 then
+        self.current_tab = 0
+        self.cursor = {}
+        return
+    else
+        if self.current_tab == 0 then
+            self.current_tab = 1
+        end
+    end
+    local new_tab = self.current_tab + offset
+    if new_tab > tab_count then return end
+    if new_tab < 1 then return end
+    self.current_tab = new_tab
+end)
+
+local get_cursor_on_tab = ya.sync(function(self)
+    change_tab(0)
+    return self.cursor[self.current_tab] or 0
+end)
+
+local update_cursor_on_tab = ya.sync(function(self, offset)
+    local new_cursor = get_cursor_on_tab() + offset
+    local max_pos = (#(self.display_data.files[self.current_tab].entries or {}))
+    if (new_cursor < 0) then
+        self.cursor[self.current_tab] = 0
+    elseif (new_cursor > max_pos) then
+        self.cursor[self.current_tab] = max_pos
+    else
+        self.cursor[self.current_tab] = new_cursor
+    end
+end)
+
+--data ops
+
 local clear_display_data = ya.sync(function(self)
     self.display_data = {
         entries = {},
@@ -62,10 +99,7 @@ local write_display_data = ya.sync(function(self, data)
 end)
 
 local update_display_data = function(entries, files)
-    --TODO: find mime types of files
-    --TODO: find matching entries
-    --TODO: make table like this per file:
-    -- return a table of structure:
+    -- returns a table of structure:
     -- {
     --  entries = { table of id -> actual entry }
     --  files =  {
@@ -112,43 +146,24 @@ local update_display_data = function(entries, files)
     })
 end
 
---cursor ops
-local change_tab = ya.sync(function(self, offset)
-    local tab_count = (#self.display_data.files or 0)
-    if tab_count == 0 then
-        self.current_tab = 0
-        self.cursor = {}
-        return
-    else
-        if self.current_tab == 0 then
-            self.current_tab = 1
-        end
-    end
-    local new_tab = self.current_tab + offset
-    if new_tab > tab_count then return end
-    if new_tab < 1 then return end
-    self.current_tab = new_tab
+--open file op
+local retrieve_open_state = ya.sync(function(self)
+    if self.current_tab == 0 then return nil, nil end
+    local file_data = self.display_data.files[self.current_tab]
+    local selected_entry_id = file_data.entries[get_cursor_on_tab() + 1]
+    local open_entry = self.display_data.entries[selected_entry_id]
+    return file_data, open_entry
 end)
 
-local get_cursor_on_tab = ya.sync(function(self)
-    change_tab(0)
-    return self.cursor[self.current_tab] or 0
-end)
-
-local update_cursor_on_tab = ya.sync(function(self, offset)
-    local new_cursor = get_cursor_on_tab() + offset
-    local max_pos = (#(self.display_data.files[self.current_tab].entries or {}))
-    if (new_cursor < 0) then
-        self.cursor[self.current_tab] = 0
-    elseif (new_cursor > max_pos) then
-        self.cursor[self.current_tab] = max_pos
-    else
-        self.cursor[self.current_tab] = new_cursor
+local open_files = function()
+    local files, entry = retrieve_open_state()
+    if files == nil then
+        error("Failed to launch.")
     end
-end)
+    execute_desktop_entry(entry, files)
+end
 
 -- main refresh op
-
 local refresh = function()
     change_tab(0)
     update_cursor_on_tab(0)
@@ -251,6 +266,8 @@ function M:act_user_input(action)
         change_tab(-1)
     elseif action == "next-file" then
         change_tab(1)
+    elseif action == "open" then
+        open_files()
     end
 end
 
