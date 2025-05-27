@@ -105,8 +105,8 @@ local update_display_data = function(entries, files)
     --  files =  {
     --      {
     --          mime = mime_type
-    --          files = { sorted list of { url } }
-    --          entries = { sorted list of entry ID's}
+    --          files = { sorted list of url }
+    --          entries = { sorted list of entry ID's }
     --      }
     --  }
     -- }
@@ -152,7 +152,7 @@ local retrieve_open_state = ya.sync(function(self)
     local file_data = self.display_data.files[self.current_tab]
     local selected_entry_id = file_data.entries[get_cursor_on_tab() + 1]
     local open_entry = self.display_data.entries[selected_entry_id]
-    return file_data, open_entry
+    return file_data.files, open_entry
 end)
 
 local open_files = function()
