@@ -87,14 +87,13 @@ local open_with_exec = function(entry_info, files)
 end
 
 local desktop_id_to_dbus = function(id)
-    return "/" .. id:gsub("%.desktop"):gsub(".", "/")
+    return "/" .. id:gsub("%.desktop", ""):gsub("%.", "/")
 end
 
 local open_with_dbus = function(entry_info, files)
-    local entry = entry_info.data
     local file_array = "["
     for index, file in ipairs(files) do
-        file_array = file_array .. "'" .. file .. "'"
+        file_array = file_array .. "'file://" .. file .. "'"
         if index < #files then
             file_array = file_array .. " "
         end
@@ -102,14 +101,14 @@ local open_with_dbus = function(entry_info, files)
     file_array = file_array .. "]"
     local _, err = Command(get_nix_command("gdbus"))
         :args({ "call", "--session", "--dest" })
-        :arg("\"" .. entry_info.id:gsub(".desktop", "") .. "\"")
+        :arg(entry_info.id:gsub("%.desktop", ""))
         :arg("--object-path")
-        :arg("\"" .. desktop_id_to_dbus(entry_info.id) .. "\"")
-        :args({ "--method", "\"org.freedesktop.Application.Open\"", })
+        :arg(desktop_id_to_dbus(entry_info.id))
+        :args({ "--method", "org.freedesktop.Application.Open", })
         :arg(file_array)
         :arg(
-            "\"{'desktop-startup-id':<'" .. os.getenv("DESKTOP_STARTUP_ID") ..
-            "'>,'activation-token':<'" .. os.getenv("XDG_ACTIVATION_TOKEN") .. "'>}"
+            "{'desktop-startup-id': <'" .. (os.getenv("DESKTOP_STARTUP_ID") or "") ..
+            "'>,'activation-token': <'" .. (os.getenv("XDG_ACTIVATION_TOKEN") or "") .. "'>}"
         )
         :stdin(Command.PIPED)
         :stdout(Command.PIPED)
