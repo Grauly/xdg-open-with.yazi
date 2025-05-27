@@ -18,21 +18,21 @@ import("utils/list.lua")
 import("utils/files.lua")
 
 --needs a plugin named "nix-commands" with a database of commands
-local get_nix_command = function(command)
+function get_nix_command(command)
     if (command:beginswith("/")) then return command end
 
     local loaded, content = pcall(require, "nix-commands")
     if not loaded then
-        err(content)
+        dbgerr(content)
         return command
     end
     if not content.commands then
-        err("nix-commands does not have a commands section, defaulting")
+        dbgerr("nix-commands does not have a commands section, defaulting")
         return command
     end
     local nix_command = content.commands[command]
     if not nix_command then
-        err("nix-commands does not have a \"" .. command .. "\" defined")
+        dbgerr("nix-commands does not have a \"" .. command .. "\" defined")
         return command
     end
     return nix_command
