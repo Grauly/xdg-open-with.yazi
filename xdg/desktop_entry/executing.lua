@@ -3,9 +3,11 @@ local split_string_to_args = function(command_string)
     command_string = command_string .. "\\\"\\\""
     for regular, escaped in command_string:gmatch("(.-)\\\"(.-)\\\"") do
         append(args, regular:split(" "))
+        if escaped == "" then break end
         escaped = escaped:gsub("\\([\\$`])", "%1")
         table.insert(args, escaped)
     end
+    return args
 end
 
 local expand_field_codes = function(args, entry_info, files)
