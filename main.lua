@@ -150,6 +150,30 @@ local update_display_data = function(entries, files)
     })
 end
 
+local toggle_opener_override = ya.sync(function(self)
+    local current_data = self.display_data.files[self.current_tab]
+    if current_data.fitting_entries ~= nil then
+        current_data.entries = current_data.fitting_entries
+        current_data.fitting_entries = nil
+    else
+        current_data.fitting_entries = current_data.entries
+        local sorted_entry_ids = {}
+        for k, _ in pairs(self.display_data.entries) do
+            table.insert(sorted_entry_ids, k)
+        end
+        table.sort(sorted_entry_ids, function(left, right)
+            return self.display_data.entries[left].data["Name"]["base"]:lower() <
+            self.display_data.entries[right].data["Name"]["base"]:lower()
+        end)
+        current_data.entries = sorted_entry_ids
+    end
+    self.display_data.files[self.current_tab] = current_data
+    write_display_data({
+        entries = self.display_data.entries,
+        files = self.display_data.files
+    })
+end)
+
 --open file op
 local retrieve_open_state = ya.sync(function(self)
     if self.current_tab == 0 then return nil, nil end
@@ -221,6 +245,7 @@ local M = {
         sc("<S-Enter>", "open-in-terminal"),
         sc("<Left>", "prev-file"),
         sc("<Right>", "next-file"),
+        sc("<o>", "toggle-override")
     },
     current_tab = 0,
     cursor = {},
@@ -277,6 +302,8 @@ function M:act_user_input(action)
         open_files(false)
     elseif action == "open-in-terminal" then
         open_files(true)
+    elseif action == "toggle-override" then
+        toggle_opener_override()
     end
 end
 
