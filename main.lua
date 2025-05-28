@@ -73,8 +73,8 @@ local update_cursor_on_tab = ya.sync(function(self, offset)
     local max_pos = (#(self.display_data.files[self.current_tab].entries or {}))
     if (new_cursor < 0) then
         self.cursor[self.current_tab] = 0
-    elseif (new_cursor > max_pos) then
-        self.cursor[self.current_tab] = max_pos
+    elseif (new_cursor >= max_pos) then
+        self.cursor[self.current_tab] = max_pos - 1
     else
         self.cursor[self.current_tab] = new_cursor
     end
