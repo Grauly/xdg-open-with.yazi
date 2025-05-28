@@ -128,12 +128,12 @@ function execute_desktop_entry(entry_info, files)
     end
 end
 
-function check_exec(entry_info)
-    local entry = entry_info.data
-    if not entry["TryExec"] then return true end
-    local parts = split_string_to_args(entry["TryExec"])
+function check_exec(entry_data)
+    if entry_data["TryExec"] == nil then return true end
+    local parts = split_string_to_args(entry_data["TryExec"])
     local command, args = first(parts)
-    local status, err = Command(command):args(args):stdin(command.PIPED):stdout(command.PIPED):status()
+    if command == "yazi" then return true end --workaround for basically bugging out yazi
+    local status, err = Command(command):args(args):status()
     if status ~= 0 or err then
         return false
     end
