@@ -350,9 +350,9 @@ function M:redraw()
         ui.Table({ ui.Row { file_names, "", data.mime } })
             :area(self.draw_area.header:pad(ui.Pad(1, 2, 0, 2)))
             :widths {
-                ui.Constraint.Percentage(85),
+                ui.Constraint.Percentage(100),
                 ui.Constraint.Min(1),
-                ui.Constraint.Percentage(15)
+                ui.Constraint.Min(#data.mime)
             },
         ui.Border(ui.Border.BOTTOM)
             :area(self.draw_area.header:pad(ui.Pad.x(1)))
