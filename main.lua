@@ -118,7 +118,7 @@ local update_display_data = function(entries, files)
         return left.data["Name"]["base"]:lower() < right.data["Name"]["base"]:lower()
     end)
     local sorted_entry_ids = {}
-    for k,_ in pairs(entries) do
+    for k, _ in pairs(entries) do
         table.insert(sorted_entry_ids, k)
     end
     table.sort(sorted_entry_ids, function(left, right)
@@ -163,7 +163,7 @@ local toggle_opener_override = ya.sync(function(self)
         end
         table.sort(sorted_entry_ids, function(left, right)
             return self.display_data.entries[left].data["Name"]["base"]:lower() <
-            self.display_data.entries[right].data["Name"]["base"]:lower()
+                self.display_data.entries[right].data["Name"]["base"]:lower()
         end)
         current_data.entries = sorted_entry_ids
     end
@@ -373,7 +373,7 @@ function M:redraw()
             :type(ui.Border.ROUNDED)
             :style(ui.Style():fg("blue"))
             :title(ui.Line("Open with: " ..
-            tostring(self.current_tab) .. "/" .. tostring((#self.display_data.files or 0))):align(ui.Line.LEFT)),
+                tostring(self.current_tab) .. "/" .. tostring((#self.display_data.files or 0))):align(ui.Line.LEFT)),
         ui.Table({ ui.Row { file_names, "", data.mime } })
             :area(self.draw_area.header:pad(ui.Pad(1, 2, 0, 2)))
             :widths {
