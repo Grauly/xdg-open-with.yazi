@@ -160,6 +160,9 @@ local open_files = function(override_term)
     if files == nil then
         error("Failed to launch.")
     end
+    if entry == nil then
+        return
+    end
     execute_desktop_entry(entry, files, override_term)
 end
 
