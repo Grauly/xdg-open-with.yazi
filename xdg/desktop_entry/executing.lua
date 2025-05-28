@@ -68,11 +68,11 @@ local expand_field_codes = function(args, entry_info, files)
     return { single_command }
 end
 
-local open_with_exec = function(entry_info, files)
+local open_with_exec = function(entry_info, files, force_term)
     local entry = entry_info.data
     local parts = split_string_to_args(entry["Exec"])
     parts[1] = get_nix_command(parts[1])
-    if entry["Terminal"] == true then
+    if entry["Terminal"] == true or force_term then
         parts = append({ get_nix_command("xdg-terminal-exec") }, parts)
     end
     local results = expand_field_codes(parts, entry_info, files)
@@ -119,12 +119,12 @@ local open_with_dbus = function(entry_info, files)
     end
 end
 
-function execute_desktop_entry(entry_info, files)
+function execute_desktop_entry(entry_info, files, force_term)
     local entry = entry_info.data
     if entry["DBusActivatable"] then
         open_with_dbus(entry_info, files)
     else
-        open_with_exec(entry_info, files)
+        open_with_exec(entry_info, files, force_term)
     end
 end
 

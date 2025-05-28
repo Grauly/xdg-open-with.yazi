@@ -155,12 +155,12 @@ local retrieve_open_state = ya.sync(function(self)
     return file_data.files, open_entry
 end)
 
-local open_files = function()
+local open_files = function(override_term)
     local files, entry = retrieve_open_state()
     if files == nil then
         error("Failed to launch.")
     end
-    execute_desktop_entry(entry, files)
+    execute_desktop_entry(entry, files, override_term)
 end
 
 -- main refresh op
@@ -267,7 +267,9 @@ function M:act_user_input(action)
     elseif action == "next-file" then
         change_tab(1)
     elseif action == "open" then
-        open_files()
+        open_files(false)
+    elseif action == "open-in-terminal" then
+        open_files(true)
     end
 end
 
