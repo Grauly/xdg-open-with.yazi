@@ -8,6 +8,7 @@ function append(list, append)
     for _, v in ipairs(append) do
         table.insert(list, v)
     end
+    return list
 end
 
 function contains(list, search)
