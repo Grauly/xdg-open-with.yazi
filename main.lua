@@ -1,3 +1,4 @@
+--- @since 25.5.28
 Plugin_Name = "xdg-open-with"
 Log_Prefix = "[" .. Plugin_Name .. "] "
 
@@ -84,6 +85,12 @@ local update_cursor_on_tab = ya.sync(function(self, offset)
     end
 end)
 
+-- main refresh op
+local refresh = function()
+    change_tab(0)
+    update_cursor_on_tab(0)
+end
+
 --data ops
 
 local clear_display_data = ya.sync(function(self)
@@ -95,9 +102,27 @@ local clear_display_data = ya.sync(function(self)
     self.current_tab = 0
 end)
 
+local handle_entry_filtering = ya.sync(function(self)
+    for _, file_data in ipairs(self.display_data.files) do
+        if (file_data.filter == nil) or (file_data.filter == "") then
+            file_data.entries = file_data.source
+            goto continue
+        end
+        local filtered_list = {}
+        for _, name in ipairs(file_data.source) do
+            if name:lower():find(file_data.filter:lower()) then
+                table.insert(filtered_list, name)
+            end
+        end
+        file_data.entries = filtered_list
+        ::continue::
+    end
+end)
+
 local write_display_data = ya.sync(function(self, data)
     clear_display_data()
     self.display_data = data
+    handle_entry_filtering()
     ya.mgr_emit("plugin", { Plugin_Name, "refresh" })
     ya.render()
 end)
@@ -111,6 +136,8 @@ local update_display_data = function(entries, files)
     --          mime = mime_type
     --          files = { sorted list of url }
     --          entries = { sorted list of entry ID's }
+    --          source = copy of entries, source for filtering
+    --          fitting_entries = copy of entries (DONT CHANGE THIS!!!)
     --      }
     --  }
     -- }
@@ -141,7 +168,9 @@ local update_display_data = function(entries, files)
         table.insert(file_displays, {
             mime = mime_type,
             files = mime_sorted_files,
-            entries = applicable_entries
+            entries = applicable_entries,
+            source = applicable_entries,
+            fitting_entries = applicable_entries
         })
     end
     write_display_data({
@@ -152,11 +181,10 @@ end
 
 local toggle_opener_override = ya.sync(function(self)
     local current_data = self.display_data.files[self.current_tab]
-    if current_data.fitting_entries ~= nil then
-        current_data.entries = current_data.fitting_entries
-        current_data.fitting_entries = nil
+    if current_data.showing_all == true then
+        current_data.source = current_data.fitting_entries
+        current_data.showing_all = nil
     else
-        current_data.fitting_entries = current_data.entries
         local sorted_entry_ids = {}
         for k, _ in pairs(self.display_data.entries) do
             table.insert(sorted_entry_ids, k)
@@ -165,7 +193,8 @@ local toggle_opener_override = ya.sync(function(self)
             return self.display_data.entries[left].data["Name"]["base"]:lower() <
                 self.display_data.entries[right].data["Name"]["base"]:lower()
         end)
-        current_data.entries = sorted_entry_ids
+        current_data.source = sorted_entry_ids
+        current_data.showing_all = true
     end
     self.display_data.files[self.current_tab] = current_data
     write_display_data({
@@ -173,6 +202,37 @@ local toggle_opener_override = ya.sync(function(self)
         files = self.display_data.files
     })
 end)
+
+
+local update_filter = ya.sync(function(self, value)
+    self.display_data.files[self.current_tab].filter = value
+    handle_entry_filtering()
+end)
+
+local do_filtering = function()
+    local prompt = ya.input {
+        title = "Filter",
+        position = { "top-center", w = 40, h = 3, y = 0, x = 0 },
+        realtime = true,
+        debounce = 0.3
+    }
+    local continue_prompt = true
+    while continue_prompt do
+        local value, event = prompt:recv()
+        if event == 0 then
+            continue_prompt = false
+        elseif event == 1 then
+            update_filter(value)
+        elseif event == 2 then
+            update_filter("")
+        elseif event == 3 then
+            update_filter(value)
+        else
+            continue_prompt = false
+        end
+        info(value)
+    end
+end
 
 --open file op
 local retrieve_open_state = ya.sync(function(self)
@@ -194,11 +254,6 @@ local open_files = function(override_term)
     execute_desktop_entry(entry, files, override_term)
 end
 
--- main refresh op
-local refresh = function()
-    change_tab(0)
-    update_cursor_on_tab(0)
-end
 
 --ui open/close
 local open_ui_if_not_open = ya.sync(function(self)
@@ -245,7 +300,8 @@ local M = {
         sc("<S-Enter>", "open-in-terminal"),
         sc("<Left>", "prev-file"),
         sc("<Right>", "next-file"),
-        sc("<o>", "toggle-override")
+        sc("<o>", "toggle-override"),
+        sc("<f>", "filter")
     },
     current_tab = 0,
     cursor = {},
@@ -304,6 +360,8 @@ function M:act_user_input(action)
         open_files(true)
     elseif action == "toggle-override" then
         toggle_opener_override()
+    elseif action == "filter" then
+        do_filtering()
     end
 end
 

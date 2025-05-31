@@ -1,6 +1,6 @@
 local get_file_mime = function(file)
     local output, err = Command(get_nix_command("xdg-mime"))
-        :args({ "query", "filetype", tostring(file) })
+        :arg({ "query", "filetype", tostring(file) })
         :stdout(Command.PIPED)
         :stdin(Command.PIPED)
         :output()

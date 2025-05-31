@@ -81,7 +81,7 @@ local open_with_exec = function(entry_info, files, force_term)
         for _,v_content in ipairs(v) do
             v_content = ya.quote(v_content)
         end
-        ya.mgr_emit("shell", v) --TODO: update to ya.emit once update hits
+        ya.emit("shell", v) --TODO: update to ya.emit once update hits
     end
 end
 
@@ -99,11 +99,11 @@ local open_with_dbus = function(entry_info, files)
     end
     file_array = file_array .. "]"
     local _, err = Command(get_nix_command("gdbus"))
-        :args({ "call", "--session", "--dest" })
+        :arg({ "call", "--session", "--dest" })
         :arg(entry_info.id:gsub("%.desktop", ""))
         :arg("--object-path")
         :arg(desktop_id_to_dbus(entry_info.id))
-        :args({ "--method", "org.freedesktop.Application.Open", })
+        :arg({ "--method", "org.freedesktop.Application.Open", })
         :arg(file_array)
         :arg(
             "{'desktop-startup-id': <'" .. (os.getenv("DESKTOP_STARTUP_ID") or "") ..
@@ -132,7 +132,7 @@ function check_exec(entry_data)
     local parts = split_string_to_args(entry_data["TryExec"])
     local command, args = first(parts)
     if command == "yazi" then return true end --workaround for basically bugging out yazi
-    local status, err = Command(command):args(args):status()
+    local status, err = Command(command):arg(args):status()
     if status ~= 0 or err then
         return false
     end
