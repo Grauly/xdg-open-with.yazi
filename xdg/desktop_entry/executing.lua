@@ -77,11 +77,12 @@ local open_with_exec = function(entry_info, files, force_term)
     end
     local results = expand_field_codes(parts, entry_info, files)
     for _, v in ipairs(results) do
-        v.orphan = true
         for _,v_content in ipairs(v) do
             v_content = ya.quote(v_content)
         end
-        ya.emit("shell", v) --TODO: update to ya.emit once update hits
+        local args_string = mergeList(v, " ")
+        dbg(dump(args_string)) 
+        ya.emit("shell", { args_string , orphan = true})
     end
 end
 

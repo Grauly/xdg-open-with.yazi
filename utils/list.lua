@@ -17,3 +17,14 @@ function contains(list, search)
     end
     return false
 end
+
+function mergeList(list, seperator)
+    local full_string = ""
+    for index, value in ipairs(list) do
+        full_string = full_string .. value
+        if index ~= #list then
+            full_string = full_string .. seperator
+        end
+    end
+    return full_string
+end
