@@ -35,7 +35,7 @@ local expand_field_codes = function(args, entry_info, files)
                 local copy = {}
                 for i, c_arg in ipairs(single_command) do
                     if i == index then
-                        c_arg = c_arg:gsub("%%[fu]", file)
+                        c_arg = c_arg:gsub("%%[fu]", ya.quote(file))
                     end
                     table.insert(copy, c_arg)
                 end
@@ -53,7 +53,7 @@ local expand_field_codes = function(args, entry_info, files)
                 end
             end
             for _, file in ipairs(files) do
-                table.insert(final_command, file)
+                table.insert(final_command, ya.quote(file))
             end
             for i, v in ipairs(single_command) do
                 if i > index then
