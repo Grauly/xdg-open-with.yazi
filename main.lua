@@ -124,7 +124,7 @@ local write_display_data = ya.sync(function(self, data)
     self.display_data = data
     handle_entry_filtering()
     ya.mgr_emit("plugin", { Plugin_Name, "refresh" })
-    ya.render()
+    ui.render()
 end)
 
 local update_display_data = function(entries, files)
@@ -260,7 +260,7 @@ local open_ui_if_not_open = ya.sync(function(self)
     if not self.children then
         self.children = Modal:children_add(self, 10)
     end
-    ya.render()
+    ui.render()
 end)
 
 local close_ui_if_open = ya.sync(function(self)
@@ -268,7 +268,7 @@ local close_ui_if_open = ya.sync(function(self)
         Modal:children_remove(self.children)
         self.children = nil
     end
-    ya.render()
+    ui.render()
 end)
 
 --shamelessly stolen from https://github.com/yazi-rs/plugins/tree/main/chmod.yazi
@@ -426,12 +426,12 @@ function M:redraw()
     -- basically stolen from https://github.com/yazi-rs/plugins/blob/a1738e8088366ba73b33da5f45010796fb33221e/mount.yazi/main.lua#L144
     return {
         ui.Clear(self.draw_area.full),
-        ui.Border(ui.Border.ALL)
+        ui.Border(ui.Edge.ALL)
             :area(self.draw_area.full)
             :type(ui.Border.ROUNDED)
             :style(ui.Style():fg("blue"))
             :title(ui.Line("Open with: " ..
-                tostring(self.current_tab) .. "/" .. tostring((#self.display_data.files or 0))):align(ui.Line.LEFT)),
+                tostring(self.current_tab) .. "/" .. tostring((#self.display_data.files or 0))):align(ui.Align.LEFT)),
         ui.Table({ ui.Row { file_names, "", data.mime } })
             :area(self.draw_area.header:pad(ui.Pad(1, 2, 0, 2)))
             :widths {
@@ -439,12 +439,12 @@ function M:redraw()
                 ui.Constraint.Min(1),
                 ui.Constraint.Min(#data.mime)
             },
-        ui.Border(ui.Border.BOTTOM)
+        ui.Border(ui.Edge.BOTTOM)
             :area(self.draw_area.header:pad(ui.Pad.x(1)))
             :type(ui.Border.PLAIN)
             :style(ui.Style():fg("blue")),
         ui.Text("Program")
-            :align(ui.Text.LEFT)
+            :align(ui.Align.LEFT)
             :area(self.draw_area.list:pad(ui.Pad.x(1)))
             :style(ui.Style():bold()),
         ui.Table(rows)
