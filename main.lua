@@ -123,7 +123,7 @@ local write_display_data = ya.sync(function(self, data)
     clear_display_data()
     self.display_data = data
     handle_entry_filtering()
-    ya.mgr_emit("plugin", { Plugin_Name, "refresh" })
+    ya.emit("plugin", { Plugin_Name, "refresh" })
     ui.render()
 end)
 
